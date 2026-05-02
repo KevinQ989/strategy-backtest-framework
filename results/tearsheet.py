@@ -1,0 +1,1 @@
+# Generate structured summary report
