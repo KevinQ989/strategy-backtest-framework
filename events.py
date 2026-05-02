@@ -1,0 +1,1 @@
+#define the Event class and its subclasses MarketEvent, SignalEvent, OrderEvent, FillEvent
