@@ -72,8 +72,9 @@ class PortfolioState:
         self.positions = self.positions[self.positions != 0]
 
         # Update cash based on fills and costs
-        self.cash -= (result.fills * self._last_prices.reindex(result.fills.index)).sum()
-        self.cash -= result.costs * pre_trade_value
+        fill_cost = (result.fills * result.execution_prices.reindex(result.fills.index)).sum()
+        self.cash -= fill_cost
+        self.cash -= result.total_cost * pre_trade_value
 
     
     def __repr__(self) -> str:
