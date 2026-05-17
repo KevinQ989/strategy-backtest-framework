@@ -1,0 +1,5 @@
+execution:
+  commission_bps: 5.0
+  spread_bps: 5.0
+  slippage_k: 0.1
+  adv_window: 20
