@@ -82,7 +82,7 @@ def _load_cache(cache_path: str) -> pd.DataFrame:
 def _merge_cache(cache_df: pd.DataFrame, new_df: pd.DataFrame) -> pd.DataFrame:
     """Merge new data with existing cache, ensuring no duplicates."""
     if cache_df.empty:
-        return new_df
+        return new_df.sort_index()
     combined = pd.concat([cache_df, new_df])
     combined = combined[~combined.index.duplicated(keep='first')]
     return combined.sort_index()
@@ -187,7 +187,6 @@ def _to_price_dataframe(
     # Select only the requested tickers and date range from the cache
     dates = cache_df.index.get_level_values('Date')
     tickers_idx = cache_df.index.get_level_values('Ticker')
-
     mask = (
         (dates >= start_ts) &
         (dates <= end_ts) &
@@ -196,7 +195,11 @@ def _to_price_dataframe(
     df = cache_df.loc[mask].copy()
 
     # Forward fill missing data
+    all_dates = df.index.get_level_values('Date').unique().sort_values()
+    full_index = pd.MultiIndex.from_product([all_dates, tickers], names=['Date', 'Ticker'])
+    df = df.reindex(full_index)
     df = df.groupby(level="Ticker", group_keys=False).ffill()
+    df["Volume"] = df["Volume"].astype('int64')
 
     # Drop dates where every ticker's Close is missing
     close_by_date = df["Close"].unstack(level="Ticker")

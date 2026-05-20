@@ -1,7 +1,34 @@
-from core.types import ExecutionResult
+from data import PriceDataFrame, get_date
+from core import ExecutionResult
 import pandas as pd
 
 class PortfolioState:
+    """
+    Single source of truth for portfolio state during simulation.
+ 
+    Tracks cash, share positions, and the most recent price reference.
+    No external component may directly modify positions or cash — all
+    mutations flow through this class's methods.
+ 
+    Positions are stored as shares (not dollar values). Dollar values
+    and weights are derived on demand from shares × _last_prices.
+ 
+    Attributes
+    ----------
+    date : pd.Timestamp
+        Current simulation date. Advanced by update_to_market.
+    cash : float
+        Uninvested capital in dollars.
+    starting_capital : float
+        Constant reference value for CAGR and drawdown calculations.
+    positions : pd.Series
+        ticker -> shares held. Positive = long, negative = short.
+    _last_prices : pd.Series
+        ticker -> most recent adj_close price. Updated by update_to_market.
+        Used to compute total_value and current_weights without requiring
+        external price input on every access.
+    """
+
     def __init__(self, date: pd.Timestamp, starting_capital: float):
         self.date = date
         self.cash = starting_capital
@@ -11,6 +38,12 @@ class PortfolioState:
 
     @property
     def total_value(self) -> float:
+        """
+        Total portfolio value in dollars.
+ 
+        Computed as cash + sum(shares_i × last_price_i).
+        Returns cash only when no positions are held.
+        """
         if self.positions.empty:
             return self.cash
         else:
@@ -19,33 +52,42 @@ class PortfolioState:
 
     @property
     def current_weights(self) -> pd.Series:
+        """
+        Current portfolio weights as fractions of total value.
+ 
+        Computed as (shares_i × last_price_i) / total_value.
+        Returns empty Series when no positions are held or total_value is zero.
+ 
+        Returns
+        -------
+        pd.Series
+            ticker -> float weight. Positive = long, negative = short.
+        """
         if self.positions.empty or self.total_value == 0:
             return pd.Series(dtype=float)
         else:
             return (self.positions * self._last_prices) / self.total_value
         
     
-    def update_to_market(self, prices: pd.DataFrame, date: pd.Timestamp) -> None:
+    def update_to_market(self, prices: PriceDataFrame, date: pd.Timestamp) -> None:
         """
-        Update portfolio state to reflect market changes up to the given date.
-
-        Must be called at the start of every trading day before any
-        weight generation or execution. Share counts do not change —
-        only _last_prices is updated, which causes total_value and
-        current_weights to reflect current market prices.
-
+        Update internal price reference and advance the simulation date.
+ 
+        Must be called at the start of every trading day before any weight
+        generation or execution. Share counts do not change — only
+        _last_prices is updated, which causes total_value and current_weights
+        to reflect current market prices on the next access.
+ 
         Parameters
         ----------
-        prices : pd.DataFrame
-            OHLCV price history up to and including date.
-            MultiIndex columns: (field, ticker), where field is one of
-            open, high, low, close, volume, adj_close.
-            Index: pd.DatetimeIndex, daily frequency, timezone-naive.
+        prices : PriceDataFrame
+            Columns: Open, High, Low, Close, Volume.
+            Close is split and dividend adjusted (auto_adjust=True).
         date : pd.Timestamp
-            Current simulation date T.
+            Current simulation date T. Must exist in prices index level 'Date'.
         """
         self.date = date
-        self._last_prices = prices.loc[date, 'adj_close']
+        self._last_prices = get_date(prices, date)["Close"]
 
     
     def update_to_execution(self, result: ExecutionResult) -> None:
@@ -84,4 +126,5 @@ class PortfolioState:
             f"total_value={self.total_value:,.2f}, "
             f"cash={self.cash:,.2f}, "
             f"positions={self.positions.to_dict()}"
+            f")"
         )
