@@ -4,7 +4,7 @@ import pandas as pd
 
 
 PriceDataFrame = NewType("PriceDataFrame", pd.DataFrame)
-PRICE_FIELDS = ["Open", "High", "Low", "Close", "Adj_Close", "Volume"]
+PRICE_FIELDS = ["Open", "High", "Low", "Close", "Volume"]
 
 
 def make_price_dataframe(df: pd.DataFrame) -> PriceDataFrame:
@@ -16,7 +16,7 @@ def make_price_dataframe(df: pd.DataFrame) -> PriceDataFrame:
     Index: pd.MultiIndex with levels (Date, Ticker)
         Date - pd.Timestamp, timezone-naive
         Ticker - str
-    Columns: Open, High, Low, Close, Adj_Close, Volume
+    Columns: Open, High, Low, Close, Volume
     Values: float64 for price fields, int64 for volume
 
     Raises
@@ -140,7 +140,7 @@ def get_date(price_df: PriceDataFrame, date: pd.Timestamp) -> pd.DataFrame:
     -------
     pd.DataFrame
         Index: Ticker (str)
-        Columns: Open, High, Low, Close, Adj_Close, Volume for the specified date.
+        Columns: Open, High, Low, Close, Volume for the specified date.
 
     Raises
     ------
@@ -170,7 +170,7 @@ def get_ticker(price_df: PriceDataFrame, ticker: str) -> pd.DataFrame:
     -------
     pd.DataFrame
         Index: Date (pd.Timestamp)
-        Columns: Open, High, Low, Close, Adj_Close, Volume for the specified ticker.
+        Columns: Open, High, Low, Close, Volume for the specified ticker.
 
     Raises
     ------
