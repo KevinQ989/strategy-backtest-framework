@@ -17,7 +17,7 @@ def load_data(
     Fetch adjusted OHLCV data for a list of tickers and return a validated
     PriceDataFrame with (Date, Ticker) index.
 
-    Data is cached in parquet format. Subsequent calls only downloads missing data.
+    Data is cached in csv format. Subsequent calls only downloads missing data.
 
     Parameters
     ----------
@@ -28,7 +28,7 @@ def load_data(
     end_date : str
         End date in "YYYY-MM-DD" format, inclusive.
     cache_path : str, optional
-        Path to cache file. Default is "market_data_cache.parquet" in the same directory as this module.
+        Path to cache file. Default is "market_data_cache.csv" in the same directory as this module.
     
     Returns
     -------

@@ -1,4 +1,5 @@
-from core.types import PortfolioWeights
+from core import PortfolioWeights
+from data import PriceDataFrame
 from abc import ABC, abstractmethod
 import pandas as pd
 
@@ -6,7 +7,7 @@ class BaseStrategy(ABC):
     @abstractmethod
     def generate(
         self,
-        prices: pd.DataFrame,
+        prices: PriceDataFrame,
         as_of: pd.Timestamp,
         current_weights: pd.Series
     ) -> PortfolioWeights:
@@ -19,17 +20,20 @@ class BaseStrategy(ABC):
 
         Parameters
         ----------
-        prices : pd.DataFrame
+        prices : PriceDataFrame
             OHLCV price history up to and including as_of.
-            MultiIndex columns: (field, ticker), where field is one of
-            open, high, low, close, volume, adj_close.
-            Index: pd.DatetimeIndex, daily frequency, timezone-naive.
+            MultiIndex (Date, Ticker) on rows. Columns: Open, High,
+            Low, Close, Volume (title case, flat — not a column MultiIndex).
+            Use get_field(prices, "Close") to get a (Date × Ticker) matrix.
+            Close prices are split and dividend adjusted (auto_adjust=True).
+            Index is pd.DatetimeIndex, daily frequency, timezone-naive.
         as_of : pd.Timestamp
             Date T. Weights will be used to trade at T+1 open.
         current_weights : pd.Series
-            Current portfolio weights, ticker -> float.
+            Current portfolio weights at end of day T, ticker -> float.
+            Positive = long, negative = short.
             Derived from PortfolioState.current_weights.
-            Empty series at T=0.
+            Empty series on the first call (no positions held).
 
         Returns
         -------
@@ -46,7 +50,7 @@ class BaseStrategy(ABC):
         date: pd.Timestamp,
         last_rebalance: pd.Timestamp,
         current_weights: pd.Series,
-        prices: pd.DataFrame
+        prices: PriceDataFrame
     ) -> bool:
         """
         Determine whether the strategy should rebalance on the given date.
@@ -63,7 +67,7 @@ class BaseStrategy(ABC):
             Date of the most recent rebalance.
         current_weights : pd.Series
             Current portfolio weights, ticker -> float.
-        prices : pd.DataFrame
+        prices : PriceDataFrame
             Full price history up to and including date. Same schema
             as described in generate().
 

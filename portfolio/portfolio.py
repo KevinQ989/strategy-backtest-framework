@@ -73,7 +73,7 @@ class PortfolioState:
         """
         Update internal price reference and advance the simulation date.
  
-        Must be called at the start of every trading day before any weight
+        Must be called at the end of every trading day before any weight
         generation or execution. Share counts do not change — only
         _last_prices is updated, which causes total_value and current_weights
         to reflect current market prices on the next access.
@@ -105,12 +105,8 @@ class PortfolioState:
         """
         pre_trade_value = self.total_value
 
-        # Update positions based on fills        
-        for ticker, shares in result.fills.items():
-            if ticker in self.positions:
-                self.positions[ticker] += shares
-            else:
-                self.positions[ticker] = shares
+        # Update positions based on fills
+        self.positions = self.positions.add(result.fills, fill_value=0.0)
         self.positions = self.positions[self.positions != 0]
 
         # Update cash based on fills and costs

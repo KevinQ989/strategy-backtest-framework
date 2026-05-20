@@ -123,8 +123,8 @@ def _compute_adv(
     for ticker in tickers:
         try:
             ticker_hist = get_ticker(hist_prices, ticker)
-            close = ticker_hist['adj_close'].iloc[-adv_window:]
-            volume = ticker_hist['volume'].iloc[-adv_window:]
+            close = ticker_hist["Close"].iloc[-adv_window:]
+            volume = ticker_hist["Volume"].iloc[-adv_window:]
             daily_dollar_volume = (close * volume).dropna()
             adv[ticker] = float(daily_dollar_volume.mean()) if not daily_dollar_volume.empty else fallback
         except KeyError:
