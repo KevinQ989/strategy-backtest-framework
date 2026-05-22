@@ -1,5 +1,5 @@
-from core import PortfolioWeights
-from data import PriceDataFrame
+from strategy_backtester.core import PortfolioWeights
+from strategy_backtester.data import PriceDataFrame
 from abc import ABC, abstractmethod
 import pandas as pd
 
