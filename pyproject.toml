@@ -9,16 +9,14 @@ description = "Strategy backtest framework for testing and evaluating trading st
 requires-python = ">=3.9"
 dependencies = [
     "numpy",
-    "scipy",
-    "matplotlib",
-    "patsy",
+    "yfinance",
+    "pandas",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "pytest-cov",
-    "statsmodels",
 ]
 
 [tool.setuptools.packages.find]
@@ -27,3 +25,4 @@ include = ["strategy_backtester*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
