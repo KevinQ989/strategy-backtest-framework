@@ -1,7 +1,7 @@
 import pytest
 import re
 import pandas as pd
-from strategy_backtester.data import (
+from strategy_backtester.data.dataframe import (
     PRICE_FIELDS,
     make_price_dataframe,
     get_field,
@@ -9,6 +9,10 @@ from strategy_backtester.data import (
     get_ticker
 )
 
+
+# ---------------------------------------------------------------------------
+# Test make_price_dataframe
+# ---------------------------------------------------------------------------
 
 def test_make_pdf_is_multiindex(mock_data_dict):
     df = pd.DataFrame(mock_data_dict)
@@ -134,6 +138,10 @@ def test_make_pdf_valid_dataframe(mock_price_dataframe):
         assert mock_price_dataframe.dtypes[col] == 'float64'
 
 
+# ---------------------------------------------------------------------------
+# Test get_field
+# ---------------------------------------------------------------------------
+
 def test_get_field_valid(mock_price_dataframe):
     close_df = get_field(mock_price_dataframe, 'Close')
     assert isinstance(close_df, pd.DataFrame)
@@ -151,6 +159,10 @@ def test_get_field_invalid(mock_price_dataframe):
     with pytest.raises(ValueError, match=re.escape(expected_message)):
         get_field(mock_price_dataframe, 'Adj_Close')
 
+
+# ---------------------------------------------------------------------------
+# Test get_date
+# ---------------------------------------------------------------------------
 
 def test_get_date_valid(mock_price_dataframe):
     date = pd.Timestamp("2020-01-01")
@@ -174,6 +186,10 @@ def test_get_date_invalid(mock_price_dataframe):
     with pytest.raises(ValueError, match=re.escape(expected_message)):
         get_date(mock_price_dataframe, date)
 
+
+# ---------------------------------------------------------------------------
+# Test get_ticker
+# ---------------------------------------------------------------------------
 
 def test_get_ticker_valid(mock_price_dataframe):
     ticker = "AAPL"
