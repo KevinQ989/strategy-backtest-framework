@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .dataframe import PriceDataFrame, PRICE_FIELDS, make_price_dataframe
 import yfinance as yf
 import pandas as pd

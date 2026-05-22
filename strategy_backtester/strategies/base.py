@@ -1,3 +1,4 @@
+from __future__ import annotations
 from strategy_backtester.core import PortfolioWeights
 from strategy_backtester.data import PriceDataFrame
 from abc import ABC, abstractmethod

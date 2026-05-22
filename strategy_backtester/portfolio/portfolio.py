@@ -1,3 +1,4 @@
+from __future__ import annotations
 from strategy_backtester.data import PriceDataFrame, get_date
 from strategy_backtester.core import ExecutionResult
 import pandas as pd
