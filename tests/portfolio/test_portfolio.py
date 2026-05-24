@@ -2,6 +2,7 @@ from __future__ import annotations
 import pytest
 import pandas as pd
 from strategy_backtester.portfolio.portfolio import PortfolioState
+from strategy_backtester.execution.simulator import _no_trade_result
 from strategy_backtester.core.types import ExecutionResult
 
 
@@ -35,18 +36,6 @@ def _make_execution_result(
         slippage=slippage,
         commission=commission,
         spread=spread,
-    )
-
-
-def _no_trade_result(date: pd.Timestamp) -> ExecutionResult:
-    return ExecutionResult(
-        date=date,
-        fills=pd.Series(dtype=float),
-        execution_prices=pd.Series(dtype=float),
-        turnover=0.0,
-        slippage=0.0,
-        commission=0.0,
-        spread=0.0,
     )
 
 

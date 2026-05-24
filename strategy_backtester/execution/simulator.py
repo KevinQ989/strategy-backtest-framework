@@ -1,8 +1,8 @@
 from __future__ import annotations
 import pandas as pd
-from data import PriceDataFrame, get_ticker
-from core import PortfolioWeights, ExecutionResult
-from portfolio.portfolio import PortfolioState
+from strategy_backtester.data import PriceDataFrame, get_ticker
+from strategy_backtester.core import PortfolioWeights, ExecutionResult
+from strategy_backtester.portfolio import PortfolioState
 
 # Cost parameters (should be moved to config)
 # Expressed in basis points (1 bp = 0.01%)
@@ -128,7 +128,7 @@ def _compute_adv(
             volume = ticker_hist["Volume"].iloc[-adv_window:]
             daily_dollar_volume = (close * volume).dropna()
             adv[ticker] = float(daily_dollar_volume.mean()) if not daily_dollar_volume.empty else fallback
-        except KeyError:
+        except ValueError:
             adv[ticker] = fallback
 
     return pd.Series(adv)
