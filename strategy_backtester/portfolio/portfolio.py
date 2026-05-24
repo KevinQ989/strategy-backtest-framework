@@ -47,8 +47,14 @@ class PortfolioState:
         """
         if self.positions.empty:
             return self.cash
-        else:
-            return self.cash + (self.positions * self._last_prices).sum()
+        position_values = self.positions * self._last_prices.reindex(self.positions.index)
+        missing = position_values[position_values.isna()].index.tolist()
+        if missing:
+            raise ValueError(
+                f"No price available for positions: {missing}. "
+                f"Call update_to_market before accessing total_value."
+            )
+        return self.cash + position_values.sum()
     
 
     @property
