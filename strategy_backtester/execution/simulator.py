@@ -1,7 +1,8 @@
+from __future__ import annotations
 import pandas as pd
-import numpy as np
-from core.types import PortfolioWeights, ExecutionResult
-from portfolio.portfolio import PortfolioState
+from strategy_backtester.data import PriceDataFrame, get_ticker
+from strategy_backtester.core import PortfolioWeights, ExecutionResult
+from strategy_backtester.portfolio import PortfolioState
 
 # Cost parameters (should be moved to config)
 # Expressed in basis points (1 bp = 0.01%)
@@ -16,7 +17,7 @@ def execute(
     pending: PortfolioWeights,
     state: PortfolioState,
     open_prices: pd.Series,
-    hist_prices: pd.DataFrame,
+    hist_prices: PriceDataFrame,
     date: pd.Timestamp,
     commission_bps: float = COMMISSION_BPS,
     spread_bps: float = SPREAD_BPS,
@@ -34,7 +35,7 @@ def execute(
         Portfolio state at end of day T / start of day T+1.
     open_prices : pd.Series
         Open prices for T+1, execution occurs at these prices.
-    hist_prices : pd.DataFrame
+    hist_prices : PriceDataFrame
         Historical prices up to and including T.
     date : pd.Timestamp
         Date of execution (T+1).
@@ -96,7 +97,7 @@ def execute(
 
 
 def _compute_adv(
-    hist_prices: pd.DataFrame,
+    hist_prices: PriceDataFrame,
     tickers: pd.Index,
     adv_window: int
 ) -> pd.Series:
@@ -105,7 +106,7 @@ def _compute_adv(
 
     Parameters
     ----------
-    hist_prices : pd.DataFrame
+    hist_prices : PriceDataFrame
         Historical prices up to and including T.
     tickers : pd.Index
         Tickers to compute ADV for.
@@ -122,11 +123,12 @@ def _compute_adv(
 
     for ticker in tickers:
         try:
-            close = hist_prices[('adj_close', ticker)].iloc[-adv_window:]
-            volume = hist_prices[('volume', ticker)].iloc[-adv_window:]
+            ticker_hist = get_ticker(hist_prices, ticker)
+            close = ticker_hist["Close"].iloc[-adv_window:]
+            volume = ticker_hist["Volume"].iloc[-adv_window:]
             daily_dollar_volume = (close * volume).dropna()
             adv[ticker] = float(daily_dollar_volume.mean()) if not daily_dollar_volume.empty else fallback
-        except KeyError:
+        except ValueError:
             adv[ticker] = fallback
 
     return pd.Series(adv)
@@ -168,8 +170,8 @@ def _no_trade_result(date: pd.Timestamp) -> ExecutionResult:
         date = date,
         fills = pd.Series(dtype=float),
         execution_prices = pd.Series(dtype=float),
-        costs = 0.0,
         turnover = 0.0,
         slippage = 0.0,
-        commission = 0.0
+        commission = 0.0,
+        spread = 0.0
     )
