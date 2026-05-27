@@ -200,7 +200,7 @@ def _to_price_dataframe(
     full_index = pd.MultiIndex.from_product([all_dates, tickers], names=['Date', 'Ticker'])
     df = df.reindex(full_index)
     df = df.groupby(level="Ticker", group_keys=False).ffill()
-    df["Volume"] = df["Volume"].astype('int64')
+    df["Volume"] = df["Volume"].fillna(0).astype('int64') #OR use Int64 instead of int64
 
     # Drop dates where every ticker's Close is missing
     close_by_date = df["Close"].unstack(level="Ticker")
