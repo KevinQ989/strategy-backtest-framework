@@ -66,7 +66,10 @@ def load_data(
 def _load_cache(cache_path: str) -> pd.DataFrame:
     """Load cache from csv if it exists."""
     if not os.path.exists(cache_path):
-        return pd.DataFrame()
+        return pd.DataFrame(
+    columns=PRICE_FIELDS,
+    index=pd.MultiIndex.from_arrays([[], []], names=['Date', 'Ticker'])
+)
     df = pd.read_csv(
         cache_path,
         index_col=['Date', 'Ticker'],
