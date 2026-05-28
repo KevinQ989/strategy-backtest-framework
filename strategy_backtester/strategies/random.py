@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
-from strategies.base import BaseStrategy
-from core.types import PortfolioWeights
+from .base import BaseStrategy
+from strategy_backtester.core.types import PortfolioWeights
 
 class RandomStrategy(BaseStrategy):
     def should_rebalance(
@@ -21,7 +21,7 @@ class RandomStrategy(BaseStrategy):
     ) -> PortfolioWeights:
 
         #Get list of unique ticker names
-        tickers = prices['Ticker'].unique()
+        tickers = prices.index.get_level_values('Ticker').unique()
 
         #Generate random weights between -1 (Short) and +1 (Long), for each ticker
         random_values = np.random.uniform(-1,1,size = len(tickers))
