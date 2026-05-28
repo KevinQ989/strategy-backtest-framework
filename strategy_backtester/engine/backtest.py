@@ -1,8 +1,8 @@
 import pandas as pd
-from data.loader import get_data
-from portfolio.portfolio import PortfolioState
-from execution.simulator import execute
-from core.types import BacktestResult
+from strategy_backtester.data import load_data
+from strategy_backtester.portfolio import PortfolioState
+from strategy_backtester.execution import execute
+from strategy_backtester.core import BacktestResult
 
 class BacktestEngine:
     def __init__(
@@ -18,7 +18,7 @@ class BacktestEngine:
 
         #Download all data
         print("Downloading historical data...")
-        self.historical_data = get_data(tickers,start_date,end_date)
+        self.historical_data = load_data(tickers, start_date, end_date)
         print("Data has been downloaded.")
 
         #Use python lists to store data first since they are faster than pd Series/Dataframe
@@ -33,7 +33,7 @@ class BacktestEngine:
         unique_dates = self.historical_data.index.unique().sort_values()
 
         if len(unique_dates) == 0:
-            raise ValueError:("No data downloaded. Check date range and tickers.")
+            raise ValueError("No data downloaded. Check date range and tickers.")
 
         first_day = unique_dates[0]
 

@@ -21,10 +21,10 @@ class RandomStrategy(BaseStrategy):
     ) -> PortfolioWeights:
 
         #Get list of unique ticker names
-        tickers = prices.['Ticker'].unique()
+        tickers = prices['Ticker'].unique()
 
         #Generate random weights between -1 (Short) and +1 (Long), for each ticker
-        random_values = np.randomo.uniform(-1,1,size = len(tickers))
+        random_values = np.random.uniform(-1,1,size = len(tickers))
         raw_weights = pd.Series(random_values, index = tickers)
 
         longs = raw_weights[raw_weights > 0]
