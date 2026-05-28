@@ -30,7 +30,7 @@ class BacktestEngine:
     def run_backtest(self, strategy) -> BacktestResult:
         print(f"Starting backtest for {strategy.__class__.__name__}.")
         
-        unique_dates = self.historical_data.index.unique().sort_values()
+        unique_dates = self.historical_data.index.get_level_values(0).unique().sort_values()
 
         if len(unique_dates) == 0:
             raise ValueError("No data downloaded. Check date range and tickers.")
@@ -68,7 +68,7 @@ class BacktestEngine:
                         next_day_data = next_day_data.to_frame().T
 
                     #Search for price at next day open
-                    open_prices = next_day_data.set_index('Ticker')['Open']
+                    open_prices = next_day_data['Open']
 
                     #Simulator executes trades and calculates slippages, commissions
                     execution_result = execute(pending = target_weights,
@@ -93,14 +93,15 @@ class BacktestEngine:
     
     def _generate_results(self):
         #Convert lists to data format of BacktestResult class
-        returns_series = pd.Series({d['date']:d['value'] for d in self.daily_returns})
-        pct_returns = returns_series['value'].pct_change().fillna(0.0)
+        returns_series = pd.Series({d['date']:d['returns'] for d in self.daily_returns})
+        pct_returns = returns_series.pct_change().fillna(0.0)
         positions_df = pd.DataFrame(self.daily_positions).set_index('date')
         costs_series = pd.Series({d['date']:d['cost'] for d in self.daily_costs}, dtype = float)
         turnover_series = pd.Series({d['date']:d['turnover'] for d in self.daily_turnover}, dtype = float)
 
-        return BacktestResult(self,
-                              returns = pct_returns,
+        print(pct_returns)
+
+        return BacktestResult(returns = pct_returns,
                               positions = positions_df,
                               costs = costs_series,
                               turnover = turnover_series,

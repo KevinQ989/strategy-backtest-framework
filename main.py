@@ -1,5 +1,6 @@
 from strategy_backtester.engine.backtest import BacktestEngine
 from strategy_backtester.strategies.random import RandomStrategy
+from strategy_backtester.results.plots import plot_performance_tearsheet
 
 if __name__ == "__main__":
     # Define backtest parameters
@@ -14,6 +15,8 @@ if __name__ == "__main__":
     # Initialize strategy
     strategy = RandomStrategy()
 
+    print("Data retrieved, running backtest now.")
+
     # Run backtest
     result = engine.run_backtest(strategy)
 
@@ -21,6 +24,6 @@ if __name__ == "__main__":
     print("Backtest completed.")
     print(f"Final portfolio value: ${result.final_value:.2f}")
     print(f"Cumulative return: {result.cumulative_return:.2%}")
-    print(f"Annualized return: {result.annualized_return:.2%}")
-    print(f"Annualized volatility: {result.annualized_volatility:.2%}")
+    print(f"Annualised return: {result.annualised_return:.2%}")
+    print(f"Annualised volatility: {result.annualised_volatility:.2%}")
     print(f"Sharpe ratio: {result.sharpe_ratio:.2f}")
