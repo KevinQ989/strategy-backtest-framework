@@ -1,11 +1,13 @@
 from .types import (
     PortfolioWeights,
     ExecutionResult,
-    BacktestResult
+    BacktestResult,
+    PermutationResult
 )
 
 __all__ = [
     "PortfolioWeights",
     "ExecutionResult",
-    "BacktestResult"
+    "BacktestResult",
+    "PermutationResult"
 ]
