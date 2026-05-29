@@ -24,11 +24,9 @@ class BacktestEngine:
 
 
     def run_backtest(self, strategy) -> BacktestResult:
-        print(f"Starting backtest for {strategy.__class__.__name__}.")
         self._reset_state()
 
         unique_dates = self.historical_data.index.get_level_values(0).unique().sort_values()
-
         if len(unique_dates) == 0:
             raise ValueError("No data downloaded. Check date range and tickers.")
 
@@ -85,7 +83,6 @@ class BacktestEngine:
             # Log daily returns, positions, costs, turnover
             self._log_day(date = current_date, portfolio = portfolio, execution_result = execution_result)
 
-        print("Backtest complete.")
         return self._generate_results()
     
 

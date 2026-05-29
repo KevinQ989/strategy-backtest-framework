@@ -118,7 +118,9 @@ class IIDScheme(BasePermutationScheme):
         shuffled_returns = returns.copy()
         for ticker in returns.columns:
             shuffled_idx = rng.permutation(len(returns) - 1) + 1  # Keep first return as 0.0 to anchor start price
-            shuffled_returns[ticker].iloc[1:] = returns[ticker].iloc[shuffled_idx].values
+            non_first_dates = returns.index[1:]
+            shuffled_dates = returns.index[shuffled_idx]
+            shuffled_returns.loc[non_first_dates, ticker] = returns.loc[shuffled_dates, ticker].values
 
         return self._reconstruct_prices(prices, shuffled_returns, rng)
     
@@ -141,6 +143,8 @@ class BlockScheme(BasePermutationScheme):
         for ticker in returns.columns:
             block_order = rng.permutation(len(block_indices))
             shuffled_idx = np.concatenate([block_indices[i] for i in block_order])
-            shuffled_returns[ticker].iloc[1:] = returns[ticker].iloc[shuffled_idx].values
+            non_first_dates = returns.index[1:]
+            shuffled_dates = returns.index[shuffled_idx]
+            shuffled_returns.loc[non_first_dates, ticker] = returns.loc[shuffled_dates, ticker].values
 
         return self._reconstruct_prices(prices, shuffled_returns, rng)

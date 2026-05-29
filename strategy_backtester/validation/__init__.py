@@ -1,7 +1,4 @@
-from .permutation import (
-    PermutationResult,
-    PermutationTest
-)
+from .permutation import PermutationTest
 from .permutation_schemes import (
     BasePermutationScheme,
     RanksScheme,
@@ -10,7 +7,6 @@ from .permutation_schemes import (
 )
 
 __all__ = [
-    "PermutationResult",
     "PermutationTest",
     "BasePermutationScheme",
     "RanksScheme",
