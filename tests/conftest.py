@@ -93,6 +93,13 @@ def price_df(raw_ohlcv_df) -> pd.DataFrame:
     return make_price_dataframe(raw_ohlcv_df.copy())
 
 
+@pytest.fixture(scope="session")
+def small_price_df(tickers) -> pd.DataFrame:
+    """50-day PriceDataFrame for tests that need a valid engine run but not full history."""
+    dates = pd.bdate_range(start=START_DATE, periods=50)
+    return make_price_dataframe(_make_ohlcv(dates, tickers[:5]))
+
+
 # ---------------------------------------------------------------------------
 # Data fixtures
 # ---------------------------------------------------------------------------

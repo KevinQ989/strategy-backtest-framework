@@ -67,3 +67,14 @@ class BacktestResult:
     @property
     def sharpe_ratio(self):
         return metrics.calc_sharpe_ratio(self.returns)
+
+
+# Result of permutation test handed to validation
+@dataclass
+class PermutationResult:
+    baseline: BacktestResult                # Backtest result from original data
+    null_distribution: list[BacktestResult] # List of backtest results from permuted data
+    p_value: float                          # One-tailed p-value of observed performance vs null
+    metric: str                             # Performance metric used for evaluation
+    N: int                                  # Number of permutations
+    scheme: str                             # Name of the permutation scheme used 
