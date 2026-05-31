@@ -1,7 +1,10 @@
 from __future__ import annotations
 import numpy as np
+import pandas as pd
 import yaml
 import os
+import io
+import urllib.request
 from strategy_backtester.engine import BacktestEngine
 from strategy_backtester.strategies import RandomStrategy, CrossSectionalMomentumStrategy
 from strategy_backtester.data import load_data
@@ -15,6 +18,28 @@ def load_config() -> dict:
     with open(CONFIG_PATH) as f:
         return yaml.safe_load(f)
     
+
+def build_universe(cfg: dict) -> list[str]:
+    universe = cfg["backtest"].get("universe", "")
+    if universe == "sp500":
+        print("Fetching S&P 500 constituents from Wikipedia...")
+        url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; strategy-backtest-framework)"}
+        )
+        with urllib.request.urlopen(req) as response:
+            html = response.read()
+        table = pd.read_html(io.BytesIO(html), attrs={"id": "constituents"})[0]
+        return table["Symbol"].str.replace(".", "-", regex=False).tolist()
+    tickers = cfg["backtest"].get("tickers", [])
+    if not tickers:
+        raise ValueError(
+            "No tickers specified. Set 'universe: sp500' or provide "
+            "a list of tickers in config.yaml."
+        )
+    return tickers
+
 
 def build_strategy(cfg: dict):
     name = cfg["backtest"]["strategy"]
@@ -37,7 +62,7 @@ def build_scheme(cfg: dict):
         return BlockScheme(block_size=cfg["permutation"]["block_size"])
     else:
         raise ValueError(f"Unknown permutation scheme: {scheme_name}")
-    
+
 
 def to_label(name: str) -> str:
     return name.replace("_", " ").title()
@@ -63,15 +88,16 @@ if __name__ == "__main__":
     # Load data
     # ------------------------------------------------------------------
     print("Loading price data...")
+    tickers = build_universe(cfg)
     prices = load_data(
-        tickers = bt["tickers"],
+        tickers = tickers,
         start_date = bt["start_date"],
         end_date = bt["end_date"]
     )
     print(f"Loaded {len(prices.index.get_level_values('Date').unique())} trading days "
-          f"for {len(bt['tickers'])} tickers.\n")
+          f"for {len(tickers)} tickers.\n")
     metadata = {
-        "tickers":         bt["tickers"],
+        "tickers":         tickers,
         "start_date":      bt["start_date"],
         "end_date":        bt["end_date"],
         "initial_capital": bt["initial_capital"],
@@ -105,6 +131,7 @@ if __name__ == "__main__":
         metric = pm["metric"],
         initial_capital=bt["initial_capital"],
         seed = pm["seed"],
+        n_jobs = pm["n_jobs"]
     )
     perm_results = perm_test.run()
     
