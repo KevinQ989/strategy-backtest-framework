@@ -1,3 +1,51 @@
+# Configurations for strategy backtester
+backtest:
+  strategy: "cross_sectional_momentum" # Options: "random", "cross_sectional_momentum"
+  initial_capital: 1_000_000.0
+  start_date: "2018-01-01"
+  end_date: "2023-12-31"
+  tickers:
+    - "AAPL"  # Apple Inc.
+    - "MSFT"  # Microsoft Corporation
+    - "GOOGL" # Alphabet Inc.
+    - "AMZN"  # Amazon.com Inc.
+    - "TSLA"  # Tesla Inc.
+    - "NVDA"  # NVIDIA Corporation
+    - "META"  # Meta Platforms Inc.
+    - "JPM"   # JPMorgan Chase & Co.
+    - "JNJ"   # Johnson & Johnson
+    - "XOM"   # Exxon Mobil Corporation
+    - "UNH"   # UnitedHealth Group Incorporated
+    - "V"     # Visa Inc.
+    - "PG"    # Procter & Gamble Co.
+    - "HD"    # Home Depot Inc.
+    - "MA"    # Mastercard Incorporated
+    - "BAC"   # Bank of America Corporation
+    - "ABBV"  # AbbVie Inc.
+    - "CVX"   # Chevron Corporation
+    - "MRK"   # Merck & Co., Inc.
+    - "LLY"   # Eli Lilly and Company
+
+
+# Strategy configurations
+strategies:
+  cross_sectional_momentum:
+    lookback: 252
+    skip: 21
+    decile: 0.2
+    rebalance_freq: 21
+
+
+# Permutation configurations
+permutation:
+  n: 1000
+  scheme: "ranks"  # Options: "ranks", "iid", "block"
+  block_size: 21
+  metric: "sharpe" # Options: "sharpe"
+  seed: 42
+
+
+# Cost configurations for simulator
 execution:
   commission_bps: 5.0
   spread_bps: 5.0

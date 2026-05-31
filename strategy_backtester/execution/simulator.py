@@ -1,16 +1,24 @@
 from __future__ import annotations
 import pandas as pd
+import yaml
+import os
 from strategy_backtester.data import PriceDataFrame, get_ticker
 from strategy_backtester.core import PortfolioWeights, ExecutionResult
 from strategy_backtester.portfolio import PortfolioState
 
-# Cost parameters (should be moved to config)
-# Expressed in basis points (1 bp = 0.01%)
-COMMISSION_BPS = 5.0 # Per-side, per trade
-SPREAD_BPS = 5.0 # Per-side
-SLIPPAGE_K = 0.1
-ADV_WINDOW = 20
 BPS = 1e-4
+
+# Load execution parameters from config.yaml
+_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "configs", "config.yaml")
+_CONFIG_PATH = os.path.normpath(_CONFIG_PATH)
+def _load_execution_config() -> dict:
+    with open(_CONFIG_PATH) as f:
+        return yaml.safe_load(f)["execution"]
+_cfg = _load_execution_config()
+COMMISSION_BPS = _cfg["commission_bps"]
+SPREAD_BPS = _cfg["spread_bps"]
+SLIPPAGE_K = _cfg["slippage_k"]
+ADV_WINDOW = _cfg["adv_window"]
 
 
 def execute(
