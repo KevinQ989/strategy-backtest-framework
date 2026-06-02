@@ -13,9 +13,15 @@ from strategy_backtester.core.types import ExecutionResult
 CAPITAL = 100_000.0
 
 
-def _make_state(trading_dates, capital: float = CAPITAL) -> PortfolioState:
+def _make_state(trading_dates, price_df, capital: float = CAPITAL) -> PortfolioState:
     """Fresh PortfolioState with no positions."""
-    return PortfolioState(date=trading_dates[0], starting_capital=capital)
+    state = PortfolioState(date=trading_dates[20], starting_capital=capital)
+    state.update_to_market(
+        price_df.xs(trading_dates[20], level="Date")["Close"],
+        trading_dates[20]
+    )
+    return state
+
 
 
 def _make_execution_result(
@@ -44,7 +50,7 @@ def _make_execution_result(
 # ---------------------------------------------------------------------------
 
 def test_init(trading_dates):
-    state = _make_state(trading_dates)
+    state = PortfolioState(date=trading_dates[0], starting_capital=CAPITAL)
     assert state.cash == CAPITAL
     assert state.starting_capital == CAPITAL
     assert state.positions.empty
@@ -56,27 +62,29 @@ def test_init(trading_dates):
 # Test total_value
 # ---------------------------------------------------------------------------
 
-def test_total_value_no_position(trading_dates):
-    state = _make_state(trading_dates)
+def test_total_value_no_position(trading_dates, price_df):
+    state = _make_state(trading_dates, price_df)
     assert state.total_value == CAPITAL
 
 
 def test_total_value_with_positions(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     ticker = price_df.index.get_level_values("Ticker").unique()[:3].tolist()
     shares = [5.0, 10.0, -3.0]
     for t, s in zip(ticker, shares):
         state.positions[t] = s
+    state._invalidate_cache()
     prices = price_df.xs(trading_dates[0], level="Date")["Close"]
     expected = CAPITAL + sum(s * prices[t] for t, s in zip(ticker, shares))
     assert state.total_value == pytest.approx(expected)
 
 
 def test_total_value_missing_prices(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     state.positions["DOES_NOT_EXIST"] = 10.0
+    state._invalidate_cache()
     with pytest.raises(ValueError, match="No price available for positions"):
         _ = state.total_value
 
@@ -85,40 +93,43 @@ def test_total_value_missing_prices(trading_dates, price_df):
 # Test current_weights
 # ---------------------------------------------------------------------------
 
-def test_current_weights_empty_no_positions(trading_dates):
-    state = _make_state(trading_dates)
+def test_current_weights_empty_no_positions(trading_dates, price_df):
+    state = _make_state(trading_dates, price_df)
     assert state.current_weights.empty
 
 
 def test_current_weights_empty_total_value_zero(trading_dates, price_df):
-    state = _make_state(trading_dates, capital=0.0)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df, capital=0.0)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     assert state.current_weights.empty
 
 
 def test_current_weights_positive_for_longs(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     ticker = price_df.index.get_level_values("Ticker").unique()[0]
     state.positions[ticker] = 10.0
+    state._invalidate_cache()
     assert state.current_weights[ticker] > 0
 
 
 def test_current_weights_negative_for_shorts(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     ticker = price_df.index.get_level_values("Ticker").unique()[0]
     state.positions[ticker] = -10.0
+    state._invalidate_cache()
     assert state.current_weights[ticker] < 0
 
 
 def test_current_weights_scale_with_price(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     ticker = price_df.index.get_level_values("Ticker").unique()[0]
     price = price_df.loc[(trading_dates[0], ticker), "Close"]
     shares = 5.0
     state.positions[ticker] = shares
+    state._invalidate_cache()
     expected_weight = (shares * price) / state.total_value
     assert state.current_weights[ticker] == pytest.approx(expected_weight)
 
@@ -128,21 +139,21 @@ def test_current_weights_scale_with_price(trading_dates, price_df):
 # ---------------------------------------------------------------------------
 
 def test_update_to_market_advances_date(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[5])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[5], level="Date")["Close"], trading_dates[5])
     assert state.date == trading_dates[5]
 
 
 def test_update_to_market_sets_last_prices(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     assert not state._last_prices.empty
 
 
 def test_update_to_market_last_prices_match_close(trading_dates, price_df):
-    state = _make_state(trading_dates)
+    state = _make_state(trading_dates, price_df)
     date = trading_dates[10]
-    state.update_to_market(price_df, date)
+    state.update_to_market(price_df.xs(date, level="Date")["Close"], date)
     expected_close = price_df.xs(date, level="Date")["Close"]
     pd.testing.assert_series_equal(
         state._last_prices.sort_index(),
@@ -152,29 +163,31 @@ def test_update_to_market_last_prices_match_close(trading_dates, price_df):
 
 
 def test_update_to_market_does_not_change_positions(trading_dates, price_df):
-    state = _make_state(trading_dates)
+    state = _make_state(trading_dates, price_df)
     ticker = price_df.index.get_level_values("Ticker").unique()[0]
     state.positions[ticker] = 10.0
-    state.update_to_market(price_df, trading_dates[1])
+    state._invalidate_cache()
+    state.update_to_market(price_df.xs(trading_dates[1], level="Date")["Close"], trading_dates[1])
     assert state.positions[ticker] == 10.0
 
 
 def test_update_to_market_does_not_change_cash(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     assert state.cash == CAPITAL
 
 
 def test_update_to_market_updates_total_value(trading_dates, price_df):
-    state = _make_state(trading_dates)
+    state = _make_state(trading_dates, price_df)
     ticker = price_df.index.get_level_values("Ticker").unique()[0]
-    state.update_to_market(price_df, trading_dates[0])
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     price_t0 = price_df.loc[(trading_dates[0], ticker), "Close"]
     state.positions[ticker] = 10.0
     state.cash = 0.0
+    state._invalidate_cache()
     value_t0 = state.total_value
 
-    state.update_to_market(price_df, trading_dates[1])
+    state.update_to_market(price_df.xs(trading_dates[1], level="Date")["Close"], trading_dates[1])
     price_t1 = price_df.loc[(trading_dates[1], ticker), "Close"]
     value_t1 = state.total_value
 
@@ -187,8 +200,8 @@ def test_update_to_market_updates_total_value(trading_dates, price_df):
 # ---------------------------------------------------------------------------
 
 def test_update_to_execution_no_trade_leaves_state_unchanged(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     cash_before = state.cash
     result = _no_trade_result(trading_dates[0])
     state.update_to_execution(result)
@@ -197,8 +210,8 @@ def test_update_to_execution_no_trade_leaves_state_unchanged(trading_dates, pric
 
 
 def test_update_to_execution_long(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     ticker = price_df.index.get_level_values("Ticker").unique()[0]
     price = price_df.loc[(trading_dates[0], ticker), "Close"]
     result = _make_execution_result(
@@ -212,8 +225,8 @@ def test_update_to_execution_long(trading_dates, price_df):
 
 
 def test_update_to_execution_short(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     ticker = price_df.index.get_level_values("Ticker").unique()[0]
     price = price_df.loc[(trading_dates[0], ticker), "Close"]
     result = _make_execution_result(
@@ -227,8 +240,8 @@ def test_update_to_execution_short(trading_dates, price_df):
 
 
 def test_update_to_execution_costs_deducted_from_cash(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     pre_trade_value = state.total_value
     slippage_fraction = 0.001
     cost_fraction = 0.0005
@@ -248,11 +261,12 @@ def test_update_to_execution_costs_deducted_from_cash(trading_dates, price_df):
 
 
 def test_update_to_execution_zero_position_removed(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     ticker = price_df.index.get_level_values("Ticker").unique()[0]
     price = price_df.loc[(trading_dates[0], ticker), "Close"]
     state.positions[ticker] = 10.0
+    state._invalidate_cache()
     result = _make_execution_result(
         date=trading_dates[0],
         fills={ticker: -10.0},
@@ -263,8 +277,8 @@ def test_update_to_execution_zero_position_removed(trading_dates, price_df):
 
 
 def test_update_to_execution_accumulates_across_calls(trading_dates, price_df):
-    state = _make_state(trading_dates)
-    state.update_to_market(price_df, trading_dates[0])
+    state = _make_state(trading_dates, price_df)
+    state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
     ticker1 = price_df.index.get_level_values("Ticker").unique()[0]
     ticker2 = price_df.index.get_level_values("Ticker").unique()[1]
     price1 = price_df.loc[(trading_dates[0], ticker1), "Close"]

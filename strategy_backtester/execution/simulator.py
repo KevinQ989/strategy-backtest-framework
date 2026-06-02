@@ -127,10 +127,17 @@ def _compute_adv(
         Average daily volume for each ticker.
     """
     fallback = 1_000_000.0
-    close = get_field(hist_prices, "Close").iloc[-adv_window:][tickers]
-    volume = get_field(hist_prices, "Volume").iloc[-adv_window:][tickers]
-    dollar_vol = (close * volume).mean()
-    return dollar_vol.fillna(fallback)
+    close = get_field(hist_prices, "Close")
+    volume = get_field(hist_prices, "Volume")
+    known_tickers = tickers[tickers.isin(close.columns)]
+    adv = pd.Series(fallback, index=tickers)
+    if not known_tickers.empty:
+        dollar_vol = (
+            close.iloc[-adv_window:][known_tickers] *
+            volume.iloc[-adv_window:][known_tickers]
+        ).mean()
+        adv[known_tickers] = dollar_vol.fillna(fallback)
+    return adv
 
 
 def _compute_commission(
