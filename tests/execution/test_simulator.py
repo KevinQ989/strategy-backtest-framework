@@ -38,7 +38,7 @@ def _make_weights(
 def _make_state(trading_dates, price_df, capital: float = CAPITAL) -> PortfolioState:
     """Fresh PortfolioState marked to market at trading_dates[20]."""
     state = PortfolioState(date=trading_dates[20], starting_capital=capital)
-    state.update_to_market(price_df, trading_dates[20])
+    state.update_to_market(price_df.xs(trading_dates[20], level="Date")["Close"], trading_dates[20])
     return state
  
  
@@ -54,7 +54,7 @@ def _make_state_with_positions(
     weights: ticker -> target weight (positive = long, negative = short).
     """
     state = PortfolioState(date=trading_dates[20], starting_capital=capital)
-    state.update_to_market(price_df, trading_dates[20])
+    state.update_to_market(price_df.xs(trading_dates[20], level="Date")["Close"], trading_dates[20])
     prices = price_df.xs(trading_dates[20], level="Date")["Close"]
     for ticker, weight in weights.items():
         dollar_val = capital * weight

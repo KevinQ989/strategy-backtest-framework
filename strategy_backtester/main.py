@@ -4,6 +4,7 @@ import pandas as pd
 import yaml
 import os
 import io
+import time
 import urllib.request
 from strategy_backtester.engine import BacktestEngine
 from strategy_backtester.strategies import RandomStrategy, CrossSectionalMomentumStrategy
@@ -88,6 +89,7 @@ if __name__ == "__main__":
     # Load data
     # ------------------------------------------------------------------
     print("Loading price data...")
+    t0 = time.perf_counter()
     tickers = build_universe(cfg)
     prices = load_data(
         tickers = tickers,
@@ -96,6 +98,7 @@ if __name__ == "__main__":
     )
     print(f"Loaded {len(prices.index.get_level_values('Date').unique())} trading days "
           f"for {len(tickers)} tickers.\n")
+    print(f"Data loaded in {time.perf_counter() - t0:.2f} seconds.")
     metadata = {
         "tickers":         tickers,
         "start_date":      bt["start_date"],
@@ -108,6 +111,7 @@ if __name__ == "__main__":
     # Backtest
     # ------------------------------------------------------------------
     print("Running backtest...")
+    t1 = time.perf_counter()
     engine = BacktestEngine(
         prices = prices,
         metadata = metadata,
@@ -116,12 +120,14 @@ if __name__ == "__main__":
     strategy = build_strategy(cfg)
     result = engine.run_backtest(strategy)
     print_result(to_label(bt["strategy"]), result)
+    print(f"Backtest completed in {time.perf_counter() - t1:.2f} seconds.")
 
     # ------------------------------------------------------------------
     # Permutation test
     # ------------------------------------------------------------------
     print(f"\n\nRunning permutation test ({pm['scheme']}, N={pm['n']})...")
     print("This will take a few minutes.\n")
+    t2 = time.perf_counter()
 
     perm_test = PermutationTest(
         prices = prices,
@@ -151,3 +157,4 @@ if __name__ == "__main__":
     else:
         print("  Interpretation: Not statistically significant.")
         print("                  Cannot reject the null hypothesis of no predictive power.")
+    print(f"Permutation test completed in {time.perf_counter() - t2:.2f} seconds.")

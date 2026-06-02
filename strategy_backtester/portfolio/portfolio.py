@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import cached_property
 from strategy_backtester.data import PriceDataFrame, get_date
 from strategy_backtester.core import ExecutionResult
 import pandas as pd
@@ -37,6 +38,25 @@ class PortfolioState:
         self.positions = pd.Series(dtype=float)    # ticker -> shares
         self._last_prices = pd.Series(dtype=float) # ticker -> price
 
+
+    @cached_property
+    def _position_values(self) -> pd.Series:
+        """
+        Cached dollar value of each position, computed as shares × last_price.
+        Recomputed only when needed.
+        """
+        if self.positions.empty:
+            return pd.Series(dtype=float)
+        position_values = self.positions * self._last_prices.reindex(self.positions.index)
+        missing = position_values[position_values.isna()].index.tolist()
+        if missing:
+            raise ValueError(
+                f"No price available for positions: {missing}. "
+                f"Call update_to_market before accessing position values."
+            )
+        return position_values
+    
+
     @property
     def total_value(self) -> float:
         """
@@ -47,13 +67,7 @@ class PortfolioState:
         """
         if self.positions.empty:
             return self.cash
-        position_values = self.positions * self._last_prices.reindex(self.positions.index)
-        missing = position_values[position_values.isna()].index.tolist()
-        if missing:
-            raise ValueError(
-                f"No price available for positions: {missing}. "
-                f"Call update_to_market before accessing total_value."
-            )
+        position_values = self._position_values
         return self.cash + position_values.sum()
     
 
@@ -73,10 +87,18 @@ class PortfolioState:
         if self.positions.empty or self.total_value == 0:
             return pd.Series(dtype=float)
         else:
-            return (self.positions * self._last_prices) / self.total_value
+            return self._position_values / self.total_value
         
     
-    def update_to_market(self, prices: PriceDataFrame, date: pd.Timestamp) -> None:
+    def _invalidate_cache(self) -> None:
+        """
+        Clear cached properties that depend on positions or prices.
+        Called after any update to positions, cash, or _last_prices.
+        """
+        self.__dict__.pop("_position_values", None)
+        
+    
+    def update_to_market(self, close_prices: pd.Series, date: pd.Timestamp) -> None:
         """
         Update internal price reference and advance the simulation date.
  
@@ -87,14 +109,14 @@ class PortfolioState:
  
         Parameters
         ----------
-        prices : PriceDataFrame
-            Columns: Open, High, Low, Close, Volume.
-            Close is split and dividend adjusted (auto_adjust=True).
+        close_prices : pd.Series
+            Series of closing prices for the current date, indexed by ticker.
         date : pd.Timestamp
             Current simulation date T. Must exist in prices index level 'Date'.
         """
         self.date = date
-        self._last_prices = get_date(prices, date)["Close"]
+        self._last_prices = close_prices
+        self._invalidate_cache()
 
     
     def update_to_execution(self, result: ExecutionResult) -> None:
@@ -120,6 +142,7 @@ class PortfolioState:
         fill_cost = (result.fills * result.execution_prices.reindex(result.fills.index)).sum()
         self.cash -= fill_cost
         self.cash -= result.total_cost * pre_trade_value
+        self._invalidate_cache()
 
     
     def __repr__(self) -> str:
