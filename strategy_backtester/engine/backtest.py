@@ -30,6 +30,8 @@ class BacktestEngine:
         if len(unique_dates) == 0:
             raise ValueError("No data downloaded. Check date range and tickers.")
         close_matrix = get_field(self.historical_data, "Close")
+        dates_level = self.historical_data.index.get_level_values("Date")
+        n_tickers = len(self.historical_data.index.get_level_values("Ticker").unique())
 
         # Day 1
         first_day = unique_dates[0]
@@ -42,9 +44,7 @@ class BacktestEngine:
         #Step through dates day by day
         for i in range(1, len(unique_dates)):
             current_date = unique_dates[i]
-            current_prices = self.historical_data.loc[
-                self.historical_data.index.get_level_values('Date') <= current_date
-            ]
+            current_prices = self.historical_data.iloc[:(i+1)*n_tickers]
             execution_result = None
 
             #Update portfolio to today's market prices
