@@ -2,7 +2,7 @@ from __future__ import annotations
 import pandas as pd
 import yaml
 import os
-from strategy_backtester.data import PriceDataFrame, get_ticker
+from strategy_backtester.data import PriceDataFrame, get_field
 from strategy_backtester.core import PortfolioWeights, ExecutionResult
 from strategy_backtester.portfolio import PortfolioState
 
@@ -127,19 +127,10 @@ def _compute_adv(
         Average daily volume for each ticker.
     """
     fallback = 1_000_000.0
-    adv = {}
-
-    for ticker in tickers:
-        try:
-            ticker_hist = get_ticker(hist_prices, ticker)
-            close = ticker_hist["Close"].iloc[-adv_window:]
-            volume = ticker_hist["Volume"].iloc[-adv_window:]
-            daily_dollar_volume = (close * volume).dropna()
-            adv[ticker] = float(daily_dollar_volume.mean()) if not daily_dollar_volume.empty else fallback
-        except ValueError:
-            adv[ticker] = fallback
-
-    return pd.Series(adv)
+    close = get_field(hist_prices, "Close").iloc[-adv_window:][tickers]
+    volume = get_field(hist_prices, "Volume").iloc[-adv_window:][tickers]
+    dollar_vol = (close * volume).mean()
+    return dollar_vol.fillna(fallback)
 
 
 def _compute_commission(

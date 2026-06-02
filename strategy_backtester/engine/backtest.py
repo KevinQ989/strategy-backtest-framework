@@ -30,7 +30,6 @@ class BacktestEngine:
         if len(unique_dates) == 0:
             raise ValueError("No data downloaded. Check date range and tickers.")
         close_matrix = get_field(self.historical_data, "Close")
-        dates_level = self.historical_data.index.get_level_values("Date")
         n_tickers = len(self.historical_data.index.get_level_values("Ticker").unique())
 
         # Day 1
@@ -119,24 +118,20 @@ class BacktestEngine:
 
     
     def _generate_results(self):
-        daily_returns = []
-        for i in range(len(self.daily_total_value)):
-            if i == 0:
-                daily_returns.append({
-                    'date':self.daily_total_value[i]['date'],
-                    'returns':0.0
-                })
-            else:
-                prev_value = self.daily_total_value[i-1]['total_value']
-                curr_value = self.daily_total_value[i]['total_value']
-                daily_returns.append({
-                    'date':self.daily_total_value[i]['date'],
-                    'returns':(curr_value - prev_value) / prev_value
-                })
-        
-        #Convert lists to data format of BacktestResult class
-        returns_series = pd.Series({d['date']:d['returns'] for d in daily_returns})
-        positions_df = pd.DataFrame(self.daily_positions).set_index('date')['positions'].apply(pd.Series).fillna(0.0)
+        # Returns
+        values = [d['total_value'] for d in self.daily_total_value]
+        dates  = [d['date'] for d in self.daily_total_value]
+        total_value_series = pd.Series(values, index=dates)
+        returns_series = total_value_series.pct_change().fillna(0.0)
+
+        # Positions
+        positions_df = pd.DataFrame.from_records(
+            [d['positions'] for d in self.daily_positions],
+            index=pd.DatetimeIndex([d['date'] for d in self.daily_positions])
+        ).fillna(0.0)
+        positions_df.index.name = 'date'
+
+        # Costs and turnover
         costs_series = pd.Series({d['date']:d['cost'] for d in self.daily_costs}, dtype = float)
         turnover_series = pd.Series({d['date']:d['turnover'] for d in self.daily_turnover}, dtype = float)
 
