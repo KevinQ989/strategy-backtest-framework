@@ -10,6 +10,8 @@ from strategy_backtester.engine import BacktestEngine
 from strategy_backtester.strategies import RandomStrategy, CrossSectionalMomentumStrategy
 from strategy_backtester.data import load_data
 from strategy_backtester.validation import PermutationTest, IIDScheme, RanksScheme, BlockScheme
+from strategy_backtester.results.plots import plot_dashboard
+import pickle
 
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "configs", "config.yaml")
@@ -140,6 +142,13 @@ if __name__ == "__main__":
         n_jobs = pm["n_jobs"]
     )
     perm_results = perm_test.run()
+
+    #Extract permutation data so we don't have to run permutations to test the dashboard
+    root_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    perm_test_data_path = os.path.join(root_folder, "tests", "results", "perm_test_data.pkl")
+    with open(perm_test_data_path, "wb") as file:
+        pickle.dump(perm_results, file)
+    print("Test data saved successfully.")
     
     null_sharpes = [r.sharpe_ratio for r in perm_results.null_distribution]
     print("\n--- Permutation Test Results ---")
@@ -158,3 +167,9 @@ if __name__ == "__main__":
         print("  Interpretation: Not statistically significant.")
         print("                  Cannot reject the null hypothesis of no predictive power.")
     print(f"Permutation test completed in {time.perf_counter() - t2:.2f} seconds.")
+
+    # ------------------------------------------------------------------
+    # Dashboard
+    # ------------------------------------------------------------------
+    print("Generating Dashboard...")
+    plot_dashboard(perm_results,cfg['dashboard']['rolling_sharpe_window'])

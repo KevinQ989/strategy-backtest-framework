@@ -53,3 +53,8 @@ execution:
   spread_bps: 5.0
   slippage_k: 0.1
   adv_window: 20
+
+
+#Dashboard configurations
+dashboard:
+  rolling_sharpe_window: 126
