@@ -42,3 +42,6 @@ cover/
 venv/
 .venv/
 env/
+
+#Dashboard tests
+tests/results/perm_test_data.pkl
