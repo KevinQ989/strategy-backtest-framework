@@ -4,14 +4,13 @@ import pandas as pd
 import yaml
 import os
 import io
+import time
 import urllib.request
 from strategy_backtester.engine import BacktestEngine
 from strategy_backtester.strategies import RandomStrategy, CrossSectionalMomentumStrategy
 from strategy_backtester.data import load_data
 from strategy_backtester.validation import PermutationTest, IIDScheme, RanksScheme, BlockScheme
 
-import cProfile
-import pstats
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "configs", "config.yaml")
 
@@ -90,6 +89,7 @@ if __name__ == "__main__":
     # Load data
     # ------------------------------------------------------------------
     print("Loading price data...")
+    t0 = time.perf_counter()
     tickers = build_universe(cfg)
     prices = load_data(
         tickers = tickers,
@@ -98,6 +98,7 @@ if __name__ == "__main__":
     )
     print(f"Loaded {len(prices.index.get_level_values('Date').unique())} trading days "
           f"for {len(tickers)} tickers.\n")
+    print(f"Data loaded in {time.perf_counter() - t0:.2f} seconds.")
     metadata = {
         "tickers":         tickers,
         "start_date":      bt["start_date"],
@@ -110,49 +111,50 @@ if __name__ == "__main__":
     # Backtest
     # ------------------------------------------------------------------
     print("Running backtest...")
+    t1 = time.perf_counter()
     engine = BacktestEngine(
         prices = prices,
         metadata = metadata,
         initial_capital = bt["initial_capital"]
     )
     strategy = build_strategy(cfg)
-    with cProfile.Profile() as pr:
-        result = engine.run_backtest(strategy)
-    stats = pstats.Stats(pr).sort_stats("cumulative")
-    stats.print_stats(20)
+    result = engine.run_backtest(strategy)
     print_result(to_label(bt["strategy"]), result)
+    print(f"Backtest completed in {time.perf_counter() - t1:.2f} seconds.")
 
-    # # ------------------------------------------------------------------
-    # # Permutation test
-    # # ------------------------------------------------------------------
-    # print(f"\n\nRunning permutation test ({pm['scheme']}, N={pm['n']})...")
-    # print("This will take a few minutes.\n")
+    # ------------------------------------------------------------------
+    # Permutation test
+    # ------------------------------------------------------------------
+    print(f"\n\nRunning permutation test ({pm['scheme']}, N={pm['n']})...")
+    print("This will take a few minutes.\n")
+    t2 = time.perf_counter()
 
-    # perm_test = PermutationTest(
-    #     prices = prices,
-    #     strategy = build_strategy(cfg),
-    #     scheme = build_scheme(cfg),
-    #     N = pm["n"],
-    #     metric = pm["metric"],
-    #     initial_capital=bt["initial_capital"],
-    #     seed = pm["seed"],
-    #     n_jobs = pm["n_jobs"]
-    # )
-    # perm_results = perm_test.run()
+    perm_test = PermutationTest(
+        prices = prices,
+        strategy = build_strategy(cfg),
+        scheme = build_scheme(cfg),
+        N = pm["n"],
+        metric = pm["metric"],
+        initial_capital=bt["initial_capital"],
+        seed = pm["seed"],
+        n_jobs = pm["n_jobs"]
+    )
+    perm_results = perm_test.run()
     
-    # null_sharpes = [r.sharpe_ratio for r in perm_results.null_distribution]
-    # print("\n--- Permutation Test Results ---")
-    # print(f"  Scheme:                 {perm_results.scheme}")
-    # print(f"  N permutations:         {perm_results.N:<8d}")
-    # print(f"  Baseline Sharpe:        {perm_results.baseline.sharpe_ratio:<8.2f}")
-    # print(f"  Mean null Sharpe:       {np.mean(null_sharpes):<8.2f}")
-    # print(f"  Null Sharpe std:        {np.std(null_sharpes):<8.2f}")
-    # print(f"  p-value (one-tailed):   {perm_results.p_value:<8.4f}")
-    # if perm_results.p_value < 0.05:
-    #     print("  Interpretation: Statistically significant at the 5% level.")
-    #     print("                  The momentum ranking criterion has predictive power.")
-    # elif perm_results.p_value < 0.10:
-    #     print("  Interpretation: Marginal significance at the 10% level.")
-    # else:
-    #     print("  Interpretation: Not statistically significant.")
-    #     print("                  Cannot reject the null hypothesis of no predictive power.")
+    null_sharpes = [r.sharpe_ratio for r in perm_results.null_distribution]
+    print("\n--- Permutation Test Results ---")
+    print(f"  Scheme:                 {perm_results.scheme}")
+    print(f"  N permutations:         {perm_results.N:<8d}")
+    print(f"  Baseline Sharpe:        {perm_results.baseline.sharpe_ratio:<8.2f}")
+    print(f"  Mean null Sharpe:       {np.mean(null_sharpes):<8.2f}")
+    print(f"  Null Sharpe std:        {np.std(null_sharpes):<8.2f}")
+    print(f"  p-value (one-tailed):   {perm_results.p_value:<8.4f}")
+    if perm_results.p_value < 0.05:
+        print("  Interpretation: Statistically significant at the 5% level.")
+        print("                  The momentum ranking criterion has predictive power.")
+    elif perm_results.p_value < 0.10:
+        print("  Interpretation: Marginal significance at the 10% level.")
+    else:
+        print("  Interpretation: Not statistically significant.")
+        print("                  Cannot reject the null hypothesis of no predictive power.")
+    print(f"Permutation test completed in {time.perf_counter() - t2:.2f} seconds.")
