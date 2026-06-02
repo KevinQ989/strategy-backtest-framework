@@ -1,6 +1,6 @@
 from __future__ import annotations
 import pandas as pd
-from strategy_backtester.data import PriceDataFrame
+from strategy_backtester.data import PriceDataFrame, get_field
 from strategy_backtester.portfolio import PortfolioState
 from strategy_backtester.execution import execute
 from strategy_backtester.core import ExecutionResult, BacktestResult
@@ -29,13 +29,14 @@ class BacktestEngine:
         unique_dates = self.historical_data.index.get_level_values(0).unique().sort_values()
         if len(unique_dates) == 0:
             raise ValueError("No data downloaded. Check date range and tickers.")
+        close_matrix = get_field(self.historical_data, "Close")
 
         # Day 1
         first_day = unique_dates[0]
         portfolio = PortfolioState(date = first_day, starting_capital=self.initial_capital)
         last_rebalance = first_day
 
-        portfolio.update_to_market(prices = self.historical_data, date = first_day)
+        portfolio.update_to_market(close_prices = close_matrix.loc[first_day], date = first_day)
         self._log_day(date = first_day, portfolio = portfolio, execution_result = None)
 
         #Step through dates day by day
@@ -47,7 +48,7 @@ class BacktestEngine:
             execution_result = None
 
             #Update portfolio to today's market prices
-            portfolio.update_to_market(prices = self.historical_data, date = current_date)
+            portfolio.update_to_market(close_prices = close_matrix.loc[current_date], date = current_date)
 
             #Check with strategy if we should trade today
             if strategy.should_rebalance(

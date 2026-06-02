@@ -10,6 +10,8 @@ from strategy_backtester.strategies import RandomStrategy, CrossSectionalMomentu
 from strategy_backtester.data import load_data
 from strategy_backtester.validation import PermutationTest, IIDScheme, RanksScheme, BlockScheme
 
+import cProfile
+import pstats
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "configs", "config.yaml")
 
@@ -114,40 +116,43 @@ if __name__ == "__main__":
         initial_capital = bt["initial_capital"]
     )
     strategy = build_strategy(cfg)
-    result = engine.run_backtest(strategy)
+    with cProfile.Profile() as pr:
+        result = engine.run_backtest(strategy)
+    stats = pstats.Stats(pr).sort_stats("cumulative")
+    stats.print_stats(20)
     print_result(to_label(bt["strategy"]), result)
 
-    # ------------------------------------------------------------------
-    # Permutation test
-    # ------------------------------------------------------------------
-    print(f"\n\nRunning permutation test ({pm['scheme']}, N={pm['n']})...")
-    print("This will take a few minutes.\n")
+    # # ------------------------------------------------------------------
+    # # Permutation test
+    # # ------------------------------------------------------------------
+    # print(f"\n\nRunning permutation test ({pm['scheme']}, N={pm['n']})...")
+    # print("This will take a few minutes.\n")
 
-    perm_test = PermutationTest(
-        prices = prices,
-        strategy = build_strategy(cfg),
-        scheme = build_scheme(cfg),
-        N = pm["n"],
-        metric = pm["metric"],
-        initial_capital=bt["initial_capital"],
-        seed = pm["seed"],
-        n_jobs = pm["n_jobs"]
-    )
-    perm_results = perm_test.run()
+    # perm_test = PermutationTest(
+    #     prices = prices,
+    #     strategy = build_strategy(cfg),
+    #     scheme = build_scheme(cfg),
+    #     N = pm["n"],
+    #     metric = pm["metric"],
+    #     initial_capital=bt["initial_capital"],
+    #     seed = pm["seed"],
+    #     n_jobs = pm["n_jobs"]
+    # )
+    # perm_results = perm_test.run()
     
-    null_sharpes = [r.sharpe_ratio for r in perm_results.null_distribution]
-    print("\n--- Permutation Test Results ---")
-    print(f"  Scheme:                 {perm_results.scheme}")
-    print(f"  N permutations:         {perm_results.N:<8d}")
-    print(f"  Baseline Sharpe:        {perm_results.baseline.sharpe_ratio:<8.2f}")
-    print(f"  Mean null Sharpe:       {np.mean(null_sharpes):<8.2f}")
-    print(f"  Null Sharpe std:        {np.std(null_sharpes):<8.2f}")
-    print(f"  p-value (one-tailed):   {perm_results.p_value:<8.4f}")
-    if perm_results.p_value < 0.05:
-        print("  Interpretation: Statistically significant at the 5% level.")
-        print("                  The momentum ranking criterion has predictive power.")
-    elif perm_results.p_value < 0.10:
-        print("  Interpretation: Marginal significance at the 10% level.")
-    else:
-        print("  Interpretation: Not statistically significant.")
-        print("                  Cannot reject the null hypothesis of no predictive power.")
+    # null_sharpes = [r.sharpe_ratio for r in perm_results.null_distribution]
+    # print("\n--- Permutation Test Results ---")
+    # print(f"  Scheme:                 {perm_results.scheme}")
+    # print(f"  N permutations:         {perm_results.N:<8d}")
+    # print(f"  Baseline Sharpe:        {perm_results.baseline.sharpe_ratio:<8.2f}")
+    # print(f"  Mean null Sharpe:       {np.mean(null_sharpes):<8.2f}")
+    # print(f"  Null Sharpe std:        {np.std(null_sharpes):<8.2f}")
+    # print(f"  p-value (one-tailed):   {perm_results.p_value:<8.4f}")
+    # if perm_results.p_value < 0.05:
+    #     print("  Interpretation: Statistically significant at the 5% level.")
+    #     print("                  The momentum ranking criterion has predictive power.")
+    # elif perm_results.p_value < 0.10:
+    #     print("  Interpretation: Marginal significance at the 10% level.")
+    # else:
+    #     print("  Interpretation: Not statistically significant.")
+    #     print("                  Cannot reject the null hypothesis of no predictive power.")
