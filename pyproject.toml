@@ -11,6 +11,8 @@ dependencies = [
     "numpy",
     "yfinance",
     "pandas",
+    "pyyaml",
+    "lxml"
 ]
 
 [project.optional-dependencies]

@@ -1,11 +1,33 @@
 from __future__ import annotations
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from strategy_backtester.core import BacktestResult, PermutationResult
 from strategy_backtester.data import PriceDataFrame
 from strategy_backtester.engine import BacktestEngine
 from strategy_backtester.strategies import BaseStrategy
 from strategy_backtester.results import calc_sharpe_ratio
 from .permutation_schemes import BasePermutationScheme
+
+
+def _run_single_permutation(args: tuple) -> BacktestResult:
+        """
+        Helper for running a single permutation in parallel.
+
+        Parameters
+        ----------
+        args : tuple
+            (prices, strategy, scheme, initial_capital, seed)
+
+        Returns
+        -------
+        BacktestResult
+            The result of the backtest on the permuted data.
+        """
+        prices, strategy, scheme, initial_capital, seed = args
+        rng = np.random.default_rng(seed)
+        permuted_prices = scheme.permute(prices, rng)
+        engine = BacktestEngine(permuted_prices, initial_capital=initial_capital)
+        return engine.run_backtest(strategy)
 
 
 class PermutationTest:
@@ -17,7 +39,8 @@ class PermutationTest:
         N: int = 1000,
         metric: str = "sharpe",
         initial_capital: float = 100000.0,
-        seed: int = 42
+        seed: int = 42,
+        n_jobs: int = 1
     ):
         self.prices = prices
         self.strategy = strategy
@@ -26,27 +49,48 @@ class PermutationTest:
         self.metric = metric
         self.initial_capital = initial_capital
         self.seed = seed
+        self.n_jobs = n_jobs
         self.rng = np.random.default_rng(seed)
         self.permutation_results = None
 
 
     def run(self) -> PermutationResult:
         #Run backtest on original data
+        print("Running baseline backtest...")
         engine = BacktestEngine(self.prices, initial_capital=self.initial_capital)
         baseline_result = engine.run_backtest(self.strategy)
         baseline_metric = self._calculate_metric(baseline_result)
 
-        #Run backtests on permuted data
+        # Pre-generate seeds for parallel execution
+        ss = np.random.SeedSequence(self.seed)
+        child_seeds = [int(s.generate_state(1)[0]) for s in ss.spawn(self.N)]
+        args = [
+            (self.prices, self.strategy, self.scheme, self.initial_capital, seed)
+            for seed in child_seeds
+        ]
+
+        # Run permutations in parallel
+        print(f"Running {self.N} permutations with {self.n_jobs} parallel jobs...")
         null_distribution = []
         null_metrics = []
-        for i in range(self.N):
-            permuted_prices = self.scheme.permute(self.prices, self.rng)
-            engine = BacktestEngine(permuted_prices, initial_capital=self.initial_capital)
-            result = engine.run_backtest(self.strategy)
-            null_distribution.append(result)
-            null_metrics.append(self._calculate_metric(result))
-            if (i + 1) % 100 == 0:
-                print(f"Completed {i + 1}/{self.N} permutations")
+        if self.n_jobs == 1:
+             for i, arg in enumerate(args):
+                result = _run_single_permutation(arg)
+                null_distribution.append(result)
+                null_metrics.append(self._calculate_metric(result))
+                if (i + 1) % 100 == 0:
+                    print(f"Completed {i + 1}/{self.N} permutations")
+        else:
+            n_workers = self.n_jobs if self.n_jobs > 0 else None
+            with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                futures = {executor.submit(_run_single_permutation, arg): i for i, arg in enumerate(args)}
+                for future in as_completed(futures):
+                    result = future.result()
+                    null_distribution.append(result)
+                    null_metrics.append(self._calculate_metric(result))
+                    completed = len(null_metrics)
+                    if completed % 100 == 0:
+                        print(f"Completed {completed}/{self.N} permutations")
         
         # Calculate one-tailed p-value
         p_value = float(np.mean(np.array(null_metrics) >= baseline_metric)) 

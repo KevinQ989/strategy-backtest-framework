@@ -50,11 +50,20 @@ def load_data(
     # Fetch missing data if needed
     if to_fetch:
         new_frames = []
+        failed_tickers = []
         for ticker, ranges in to_fetch.items():
             for range_start, range_end in ranges:
                 data = _download(ticker, range_start, range_end)
                 if not data.empty:
                     new_frames.append(data)
+                else:
+                    failed_tickers.append(ticker)
+        if failed_tickers:
+            unique_failed = list(dict.fromkeys(failed_tickers))
+            print(
+                f"Warning: Failed to download data for {len(unique_failed)} tickers: "
+                f"{unique_failed}"
+            )
         if new_frames:
             cache_df = _merge_cache(cache_df, pd.concat(new_frames))
             _save_cache(cache_df, cache_path)
@@ -204,6 +213,18 @@ def _to_price_dataframe(
     df = df.reindex(full_index)
     df = df.groupby(level="Ticker", group_keys=False).ffill()
     df["Volume"] = df["Volume"].fillna(0).astype('int64') #OR use Int64 instead of int64
+
+    # Drop tickers that still have NaNs after ffill
+    close_wide = df["Close"].unstack(level="Ticker")
+    tickers_with_nans = close_wide.columns[close_wide.isna().any()].tolist()
+    if tickers_with_nans:
+        print(
+            f"Warning: {len(tickers_with_nans)} tickers dropped due to insufficient "
+            f"history for start_date {start_ts.date()}: {tickers_with_nans}"
+        )
+        df = df.loc[~df.index.get_level_values("Ticker").isin(tickers_with_nans)]
+
+    df["Volume"] = df["Volume"].astype('int64')
 
     # Drop dates where every ticker's Close is missing
     close_by_date = df["Close"].unstack(level="Ticker")
