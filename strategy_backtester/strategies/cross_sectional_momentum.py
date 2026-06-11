@@ -71,9 +71,8 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
         prices : PriceDataFrame
             OHLCV price history up to and including as_of.
             MultiIndex (Date, Ticker) on rows. Columns: Open, High,
-            Low, Close, Volume (title case, flat — not a column MultiIndex).
+            Low, Close, Volume, Adj Close (title case, flat — not a column MultiIndex).
             Use get_field(prices, "Close") to get a (Date × Ticker) matrix.
-            Close prices are split and dividend adjusted (auto_adjust=True).
             Index is pd.DatetimeIndex, daily frequency, timezone-naive.
         as_of : pd.Timestamp
             Date T. Weights will be used to trade at T+1 open.
@@ -89,8 +88,8 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
             Target weights for T+1. Weights are fractions of total
             portfolio value, not dollar amounts.
         """
-        close = get_field(prices, "Close")
-        dates = close.index
+        adj_close = get_field(prices, "Adj_Close")
+        dates = adj_close.index
 
         # Ensure we have enough history to compute the signal
         current_idx = dates.get_loc(as_of)
@@ -102,8 +101,8 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
             )
 
         # Compute momentum signal: cumulative return from T - lookback to T - skip
-        price_start = close.iloc[current_idx - self.lookback]
-        price_end = close.iloc[current_idx - self.skip]
+        price_start = adj_close.iloc[current_idx - self.lookback]
+        price_end = adj_close.iloc[current_idx - self.skip]
         momentum = (price_end / price_start - 1.0).dropna()
         if momentum.empty:
             return PortfolioWeights(

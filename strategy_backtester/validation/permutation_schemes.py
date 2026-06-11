@@ -61,6 +61,7 @@ class BasePermutationScheme(ABC):
         orig_open = get_field(original, "Open")
         orig_high = get_field(original, "High")
         orig_low = get_field(original, "Low")
+        orig_adj_close = get_field(original, "Adj_Close")
         orig_volume = get_field(original, "Volume")
 
         # Reconstruct close prices from permuted returns
@@ -72,6 +73,7 @@ class BasePermutationScheme(ABC):
         permuted_open = orig_open * scaling_factors
         permuted_high = orig_high * scaling_factors
         permuted_low = orig_low * scaling_factors
+        permuted_adj_close = orig_adj_close * scaling_factors
         
         # Shuffle volume independently
         permuted_volume = orig_volume.copy()
@@ -85,6 +87,7 @@ class BasePermutationScheme(ABC):
             permuted_high.stack().rename("High"),
             permuted_low.stack().rename("Low"),
             permuted_close.stack().rename("Close"),
+            permuted_adj_close.stack().rename("Adj_Close"),
             permuted_volume.stack().rename("Volume")
         ], axis=1)
         permuted_df.index.names = ["Date", "Ticker"]
