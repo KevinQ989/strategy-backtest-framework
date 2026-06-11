@@ -151,10 +151,8 @@ if __name__ == "__main__":
     print(f"  p-value (one-tailed):   {perm_results.p_value:<8.4f}")
     if perm_results.p_value < 0.05:
         print("  Interpretation: Statistically significant at the 5% level.")
-        print("                  The momentum ranking criterion has predictive power.")
     elif perm_results.p_value < 0.10:
         print("  Interpretation: Marginal significance at the 10% level.")
     else:
-        print("  Interpretation: Not statistically significant.")
-        print("                  Cannot reject the null hypothesis of no predictive power.")
+        print("  Interpretation: Not statistically significant. Cannot reject the null hypothesis of no predictive power.")
     print(f"Permutation test completed in {time.perf_counter() - t2:.2f} seconds.")

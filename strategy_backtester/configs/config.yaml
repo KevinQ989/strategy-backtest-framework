@@ -39,7 +39,7 @@ strategies:
 
 # Permutation configurations
 permutation:
-  n: 1000
+  n: 10
   scheme: "ranks"  # Options: "ranks", "iid", "block"
   block_size: 21
   metric: "sharpe" # Options: "sharpe"
