@@ -5,12 +5,26 @@ from .permutation_strategy import PermutationStrategyWrapper
 
 
 class IIDPermutationStrategy(PermutationStrategyWrapper):
+    """
+    Null hypothesis: each ticker's daily returns are i.i.d. over time.
+
+    Overrides prepare() to independently shuffle each ticker's daily Close
+    returns (the first day's return is held fixed at 0.0 to anchor the start
+    price), then reconstructs a full OHLCV price series consistent with the
+    shuffled returns. Open, High, Low, and Adj_Close are scaled by the same
+    daily factor as Close to preserve intraday structure; Volume is shuffled
+    independently per ticker. generate() and should_rebalance() are
+    unchanged from the wrapped strategy.
+
+    This tests whether the strategy's performance depends on the time-series
+    ordering of returns, as opposed to their cross-sectional distribution.
+    """
     def _reconstruct_prices(
             self,
             original: PriceDataFrame,
             permuted_returns: pd.DataFrame
         ) -> PriceDataFrame:
-        """""
+        """
         Reconstruct a valid OHLCV PriceDataFrame from permuted Close returns.
 
         All inputs and intermediate computations are in wide (Date × Ticker)

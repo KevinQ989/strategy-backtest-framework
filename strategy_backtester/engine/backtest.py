@@ -24,10 +24,13 @@ class BacktestEngine:
         self.daily_positions = []
         self.daily_costs = []
         self.daily_turnover = []
+        self._has_run = False
 
 
     def run_backtest(self) -> BacktestResult:
-        self._reset_state()
+        if self._has_run:
+            raise RuntimeError("Backtest has already been run. Create a new BacktestEngine instance to run another backtest.")
+        self._has_run = True
 
         unique_dates = self.historical_data.index.get_level_values(0).unique().sort_values()
         if len(unique_dates) == 0:
@@ -86,13 +89,6 @@ class BacktestEngine:
             self._log_day(date = current_date, portfolio = portfolio, execution_result = execution_result)
 
         return self._generate_results()
-    
-
-    def _reset_state(self):
-        self.daily_total_value = []
-        self.daily_positions = []
-        self.daily_costs = []
-        self.daily_turnover = []
 
 
     def _log_day(

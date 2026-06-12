@@ -7,6 +7,31 @@ from .permutation_strategy import PermutationStrategyWrapper
 
 
 class BlockPermutationStrategy(PermutationStrategyWrapper):
+    """
+    Null hypothesis: each ticker's daily returns are exchangeable in
+    contiguous blocks, preserving short-run serial dependence.
+
+    Overrides prepare() to independently shuffle each ticker's daily Close
+    returns in contiguous blocks of block_size days (block order is permuted;
+    intra-block order is preserved, and the first day's return is held fixed
+    at 0.0 to anchor the start price), then reconstructs a full OHLCV price
+    series consistent with the shuffled returns. Open, High, Low, and Adj_Close
+    are scaled by the same daily factor as Close to preserve intraday structure;
+    Volume is shuffled independently per ticker. generate() and should_rebalance()
+    are unchanged from the wrapped strategy.
+
+    This tests whether the strategy's edge depends on cross-block
+    (longer-horizon) structure rather than on short-run dependence alone.
+
+    Parameters
+    ----------
+    strategy : BaseStrategy
+        The strategy being tested.
+    rng : np.random.Generator
+        Random number generator used for this permutation.
+    block_size : int, default 20
+        Length of each contiguous block, in trading days.
+    """
     def __init__(self, strategy: BaseStrategy, rng: np.random.Generator, block_size: int = 20):
         super().__init__(strategy, rng)
         self.block_size = block_size
@@ -17,7 +42,7 @@ class BlockPermutationStrategy(PermutationStrategyWrapper):
             original: PriceDataFrame,
             permuted_returns: pd.DataFrame
         ) -> PriceDataFrame:
-        """""
+        """
         Reconstruct a valid OHLCV PriceDataFrame from permuted Close returns.
 
         All inputs and intermediate computations are in wide (Date × Ticker)

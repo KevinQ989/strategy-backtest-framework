@@ -26,9 +26,9 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
     skip : int
         Number of most recent trading days to exclude from the signal.
         Default is 21 (approximately 1 month).
-    quintile : float
+    percent : float
         Fraction of the universe assigned to each leg. Default is 0.1 (top
-        and bottom 10%). Must satisfy 2 * quintile <= 1.0.
+        and bottom 10%). Must satisfy 2 * percent <= 1.0.
     rebalance_freq : int
         Minimum number of calendar days between rebalances. Default is 21
         (approximately monthly).
@@ -37,16 +37,125 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
         self,
         lookback: int = 252,
         skip: int = 21,
-        quintile: float = 0.1,
+        percent: float = 0.1,
         rebalance_freq: int = 21
     ):
-        if not (0 < quintile <= 0.5):
-            raise ValueError("quintile must be in the range (0, 0.5]")
+        if not (0 < percent <= 0.5):
+            raise ValueError("percent must be in the range (0, 0.5]")
         self.lookback = lookback
         self.skip = skip
-        self.quintile = quintile
+        self.percent = percent
         self.rebalance_freq = rebalance_freq
-    
+
+
+    def _compute_signal(
+        self,
+        prices: PriceDataFrame,
+        as_of: pd.Timestamp
+    ) -> pd.Series:
+        """
+        Compute the 12-1 month momentum signal for each ticker as of a given date.
+
+        The signal is the cumulative return over the window [T - lookback, T - skip],
+        where T = as_of, computed on Adj_Close. Tickers with insufficient history
+        or missing data are excluded.
+
+        Parameters
+        ----------
+        prices : PriceDataFrame
+            OHLCV price history up to and including as_of.
+            MultiIndex (Date, Ticker) on rows.
+            Columns: Open, High, Low, Close, Volume, Adj_Close.
+            Index is pd.DatetimeIndex, daily frequency, timezone-naive.
+        as_of : pd.Timestamp
+            Date T. Signal is computed using only data up to and including T.
+
+        Returns
+        -------
+        pd.Series
+            Momentum signal, indexed by ticker. Empty if there is insufficient
+            history (current_idx < lookback) or no tickers have a valid signal.
+        """
+        adj_close = get_field(prices, "Adj_Close")
+        dates = adj_close.index
+
+        # Ensure we have enough history to compute the signal
+        current_idx = dates.get_loc(as_of)
+        if current_idx < self.lookback:
+            return pd.Series(dtype=float)
+
+        # Compute momentum signal: cumulative return from T - lookback to T - skip
+        price_start = adj_close.iloc[current_idx - self.lookback]
+        price_end = adj_close.iloc[current_idx - self.skip]
+        momentum = (price_end / price_start - 1.0).dropna()
+
+        return momentum
+
+
+    def _weights_from_signal(
+        self,
+        signal: pd.Series,
+        as_of: pd.Timestamp
+    ) -> PortfolioWeights:
+        """
+        Convert a momentum signal into equal-weighted long/short portfolio weights.
+
+        Ranks tickers by signal in descending order. The top percent is assigned
+        equal positive weights (long); the bottom percent is assigned equal
+        negative weights (short). Weights are scaled by half-Kelly (0.5/q per leg).
+
+        Parameters
+        ----------
+        signal : pd.Series
+            Momentum signal, indexed by ticker. May be empty.
+        as_of : pd.Timestamp
+            Date T. Returned weights are for T+1.
+
+        Returns
+        -------
+        PortfolioWeights
+            Target weights for T+1. Empty long/short weights if signal is empty.
+
+        Raises
+        ------
+        ValueError
+            If the signal has fewer than 2 * (1 / percent) tickers, i.e. too
+            few to construct non-empty long and short legs.
+        """
+        if signal.empty:
+            return PortfolioWeights(
+                date = as_of,
+                long_weights = pd.Series(dtype=float),
+                short_weights = pd.Series(dtype=float)
+            )
+
+        # Check that universe is large enough to form long/short legs
+        q = int(len(signal) * self.percent)
+        if q < 2:
+            raise ValueError(
+                f"Universe too small to construct momentum portfolios. "
+                f"Need at least {int(2 / self.percent)} tickers with valid signals, "
+                f"got {len(signal)}."
+            )
+
+        # Rank tickers by signal in descending order (1 = highest signal)
+        ranked = signal.rank(method='first', ascending=False)
+        n = len(signal)
+
+        # Assign long weights to top percent
+        long_tickers = ranked[ranked <= q].index
+        long_weights = pd.Series(+0.5 / q, index=long_tickers)
+
+        # Assign short weights to bottom percent
+        short_tickers = ranked[ranked > n - q].index
+        short_weights = pd.Series(-0.5 / q, index=short_tickers)
+
+        return PortfolioWeights(
+            date = as_of,
+            long_weights = long_weights,
+            short_weights = short_weights
+        )
+
 
     def generate(
         self,
@@ -58,11 +167,6 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
         Generate equal-weighted long/short portfolio weights based on
         12-1 month cross-sectional momentum.
 
-        Computes the momentum signal for each ticker as the cumulative return
-        over the window [T - lookback, T - skip], where T = as_of. Tickers
-        are ranked by this signal. The top quintile is assigned equal positive
-        weights; the bottom quintile is assigned equal negative weights.
-
         The engine guarantees that prices contains only data up to and
         including as_of. No data beyond as_of is accessed.
 
@@ -70,9 +174,8 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
         ----------
         prices : PriceDataFrame
             OHLCV price history up to and including as_of.
-            MultiIndex (Date, Ticker) on rows. Columns: Open, High,
-            Low, Close, Volume, Adj Close (title case, flat — not a column MultiIndex).
-            Use get_field(prices, "Close") to get a (Date × Ticker) matrix.
+            MultiIndex (Date, Ticker) on rows.
+            Columns: Open, High, Low, Close, Volume, Adj_Close.
             Index is pd.DatetimeIndex, daily frequency, timezone-naive.
         as_of : pd.Timestamp
             Date T. Weights will be used to trade at T+1 open.
@@ -88,55 +191,8 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
             Target weights for T+1. Weights are fractions of total
             portfolio value, not dollar amounts.
         """
-        adj_close = get_field(prices, "Adj_Close")
-        dates = adj_close.index
-
-        # Ensure we have enough history to compute the signal
-        current_idx = dates.get_loc(as_of)
-        if current_idx < self.lookback:
-            return PortfolioWeights(
-                date = as_of,
-                long_weights = pd.Series(dtype=float),
-                short_weights = pd.Series(dtype=float)
-            )
-
-        # Compute momentum signal: cumulative return from T - lookback to T - skip
-        price_start = adj_close.iloc[current_idx - self.lookback]
-        price_end = adj_close.iloc[current_idx - self.skip]
-        momentum = (price_end / price_start - 1.0).dropna()
-        if momentum.empty:
-            return PortfolioWeights(
-                date = as_of,
-                long_weights = pd.Series(dtype=float),
-                short_weights = pd.Series(dtype=float)
-            )
-        
-        # Check that universe is large enough to form quintiles
-        q = int(len(momentum) * self.quintile)
-        if q < 2:
-            raise ValueError(
-                f"Universe too small to construct momentum quintiles. "
-                f"Need at least {int(2 / self.quintile)} tickers with valid signals, "
-                f"got {len(momentum)}."
-            )
-
-        # Rank tickers by momentum in descending order (1 = highest momentum)
-        ranked = momentum.rank(method='first', ascending=False)
-        n = len(momentum)
-
-        # Assign long weights to top quintile
-        long_tickers = ranked[ranked <= q].index
-        long_weights = pd.Series(+0.5 / q, index=long_tickers)
-
-        # Assign short weights to bottom quintile
-        short_tickers = ranked[ranked > n - q].index
-        short_weights = pd.Series(-0.5 / q, index=short_tickers)
-        
-        return PortfolioWeights(
-            date = as_of,
-            long_weights = long_weights,
-            short_weights = short_weights
-        )
+        signal = self._compute_signal(prices, as_of)
+        return self._weights_from_signal(signal, as_of)
 
 
     def should_rebalance(

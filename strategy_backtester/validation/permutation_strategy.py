@@ -8,13 +8,23 @@ from strategy_backtester.strategies import BaseStrategy
 
 class PermutationStrategyWrapper(BaseStrategy):
     """
-    ...
+    Base class for strategies that wrap another strategy to construct a
+    null-hypothesis backtest for permutation testing.
+
+    By default, prepare(), generate(), and should_rebalance() all delegate
+    unchanged to the wrapped strategy — a subclass overrides whichever
+    method(s) implement its particular permutation scheme (e.g. reshuffling
+    prices in prepare(), or reshuffling signal-to-ticker assignment in
+    generate()).
 
     Parameters
     ----------
     strategy : BaseStrategy
-        The original strategy to be wrapped. This strategy will be trained and
-        evaluated on permuted price data.
+        The strategy being tested. Its prepare/generate/should_rebalance
+        behaviour is used as-is except where overridden by the subclass.
+    rng : np.random.Generator
+        Random number generator used for this permutation. Each permutation
+        should be constructed with its own independently-seeded generator.
     """
     def __init__(self, strategy: BaseStrategy, rng: np.random.Generator):
         self.strategy = strategy

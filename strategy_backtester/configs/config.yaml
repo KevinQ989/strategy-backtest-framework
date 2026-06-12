@@ -33,13 +33,13 @@ strategies:
   cross_sectional_momentum:
     lookback: 252
     skip: 21
-    quintile: 0.1
+    percent: 0.1
     rebalance_freq: 21
 
 
 # Permutation configurations
 permutation:
-  n: 1000
+  n: 10
   scheme: "ranks"  # Options: "ranks", "iid", "block"
   block_size: 21
   metric: "sharpe" # Options: "sharpe"

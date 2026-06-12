@@ -11,18 +11,26 @@ class BaseStrategy(ABC):
         prices: PriceDataFrame
     ) -> PriceDataFrame:
         """
-        ...
-        
+        Apply preprocessing to the full price history before the backtest begins.
+
+        Called once by BacktestEngine at construction time, before any calls to
+        generate() or should_rebalance(). The default implementation is a no-op
+        passthrough; subclasses override this to transform prices ahead of the
+        simulation — for example, permutation-test wrappers that reshuffle
+        historical returns to construct a null price series.
+
         Parameters
         ----------
         prices : PriceDataFrame
-            OHLCV price history for the entire backtest period.
-        
+            OHLCV price history for the entire backtest period, as loaded
+            (unfiltered by date).
+
         Returns
         -------
         PriceDataFrame
-            Preprocessed OHLCV price history for the entire backtest period.
-        """    
+            Preprocessed price history, with the same schema as the input,
+            to be used as the historical data for the remainder of the backtest.
+        """
         return prices
     
 
