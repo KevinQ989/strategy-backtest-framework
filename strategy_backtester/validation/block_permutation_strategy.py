@@ -1,41 +1,21 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 from strategy_backtester.data import PriceDataFrame, get_field, make_price_dataframe
+from strategy_backtester.strategies import BaseStrategy
+from .permutation_strategy import PermutationStrategyWrapper
 
 
-class BasePermutationScheme(ABC):
-    @abstractmethod
-    def permute(self, prices: PriceDataFrame, rng: np.random.Generator) -> PriceDataFrame:
-        """
-        Given a price dataframe, return a permuted version of the dataframe.
-
-        The permutation should preserve the structure of the dataframe (same
-        columns, same index), but shuffle the data in a way that breaks any
-        temporal dependence. Examples include shuffling returns, circularly
-        shifting returns, or shuffling residuals from a factor model.
-
-        Parameters
-        ----------
-        prices : PriceDataFrame
-            Original price dataframe to be permuted.
-        rng : np.random.Generator
-            Random number generator for reproducibility.
-
-        Returns
-        -------
-        PriceDataFrame
-            Permuted price dataframe with the same structure as the input.
-        """
-        ...
+class BlockPermutationStrategy(PermutationStrategyWrapper):
+    def __init__(self, strategy: BaseStrategy, rng: np.random.Generator, block_size: int = 20):
+        super().__init__(strategy, rng)
+        self.block_size = block_size
 
 
     def _reconstruct_prices(
             self,
             original: PriceDataFrame,
-            permuted_returns: pd.DataFrame,
-            rng: np.random.Generator
+            permuted_returns: pd.DataFrame
         ) -> PriceDataFrame:
         """""
         Reconstruct a valid OHLCV PriceDataFrame from permuted Close returns.
@@ -54,8 +34,6 @@ class BasePermutationScheme(ABC):
         permuted_returns : pd.DataFrame
             Permuted daily returns in wide (Date × Ticker) format.
             Row 0 must be 0.0 (no return on first day — anchors start price).
-        rng : np.random.Generator
-            Random number generator for volume shuffling.
         """
         orig_close = get_field(original, "Close")
         orig_open = get_field(original, "Open")
@@ -78,7 +56,7 @@ class BasePermutationScheme(ABC):
         # Shuffle volume independently
         permuted_volume = orig_volume.copy()
         for col in orig_volume.columns:
-            permuted_idx = rng.permutation(len(orig_volume))
+            permuted_idx = self.rng.permutation(len(orig_volume))
             permuted_volume[col] = orig_volume[col].values[permuted_idx]
         
         # Combine into a new PriceDataFrame
@@ -93,48 +71,9 @@ class BasePermutationScheme(ABC):
         permuted_df.index.names = ["Date", "Ticker"]
         permuted_df["Volume"] = permuted_df["Volume"].astype('int64')
         return make_price_dataframe(permuted_df)
-
-
-class RanksScheme(BasePermutationScheme):
-    """Shuffle cross-sectional rank order per period."""
-    def permute(self, prices: PriceDataFrame, rng: np.random.Generator) -> PriceDataFrame:
-        close = get_field(prices, "Close")
-        returns = close.pct_change().fillna(0.0)
-
-        # Permute returns independently for each date
-        permuted_matrix = np.array([
-            returns.values[i, rng.permutation(returns.shape[1])] for i in range(len(returns))
-        ])
-        shuffled_returns = pd.DataFrame(permuted_matrix, index=returns.index, columns=returns.columns)
-        shuffled_returns.iloc[0] = 0.0
-
-        return self._reconstruct_prices(prices, shuffled_returns, rng)
-
-
-class IIDScheme(BasePermutationScheme):
-    """Shuffle daily returns independently across time, per ticker."""
-    def permute(self, prices: PriceDataFrame, rng: np.random.Generator) -> PriceDataFrame:
-        close = get_field(prices, "Close")
-        returns = close.pct_change().fillna(0.0)
-
-        # Permute returns independently for each ticker
-        shuffled_returns = returns.copy()
-        for ticker in returns.columns:
-            shuffled_idx = rng.permutation(len(returns) - 1) + 1  # Keep first return as 0.0 to anchor start price
-            non_first_dates = returns.index[1:]
-            shuffled_dates = returns.index[shuffled_idx]
-            shuffled_returns.loc[non_first_dates, ticker] = returns.loc[shuffled_dates, ticker].values
-
-        return self._reconstruct_prices(prices, shuffled_returns, rng)
     
 
-class BlockScheme(BasePermutationScheme):
-    """Shuffle contiguous blocks of returns, preserving intra-block structure."""
-    def __init__(self, block_size: int = 20):
-        self.block_size = block_size
-
-
-    def permute(self, prices: PriceDataFrame, rng: np.random.Generator) -> PriceDataFrame:
+    def prepare(self, prices: PriceDataFrame) -> PriceDataFrame:
         close = get_field(prices, "Close")
         returns = close.pct_change().fillna(0.0)
     
@@ -144,10 +83,10 @@ class BlockScheme(BasePermutationScheme):
         block_starts = np.arange(1, n, self.block_size)
         block_indices = [np.arange(start, min(start + self.block_size, n)) for start in block_starts]
         for ticker in returns.columns:
-            block_order = rng.permutation(len(block_indices))
+            block_order = self.rng.permutation(len(block_indices))
             shuffled_idx = np.concatenate([block_indices[i] for i in block_order])
             non_first_dates = returns.index[1:]
             shuffled_dates = returns.index[shuffled_idx]
             shuffled_returns.loc[non_first_dates, ticker] = returns.loc[shuffled_dates, ticker].values
 
-        return self._reconstruct_prices(prices, shuffled_returns, rng)
+        return self._reconstruct_prices(prices, shuffled_returns)

@@ -11,7 +11,7 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
 
     Ranks all tickers by their 12-1 month return (12-month cumulative return
     excluding the most recent month) at each rebalance date. Goes long the top
-    decile and short the bottom decile with equal weighting within each leg.
+    quintile and short the bottom quintile with equal weighting within each leg.
     Rebalances monthly.
 
     The 12-1 month return is defined as the cumulative return from 252 trading
@@ -26,9 +26,9 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
     skip : int
         Number of most recent trading days to exclude from the signal.
         Default is 21 (approximately 1 month).
-    decile : float
+    quintile : float
         Fraction of the universe assigned to each leg. Default is 0.1 (top
-        and bottom 10%). Must satisfy 2 * decile <= 1.0.
+        and bottom 10%). Must satisfy 2 * quintile <= 1.0.
     rebalance_freq : int
         Minimum number of calendar days between rebalances. Default is 21
         (approximately monthly).
@@ -37,14 +37,14 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
         self,
         lookback: int = 252,
         skip: int = 21,
-        decile: float = 0.1,
+        quintile: float = 0.1,
         rebalance_freq: int = 21
     ):
-        if not (0 < decile <= 0.5):
-            raise ValueError("decile must be in the range (0, 0.5]")
+        if not (0 < quintile <= 0.5):
+            raise ValueError("quintile must be in the range (0, 0.5]")
         self.lookback = lookback
         self.skip = skip
-        self.decile = decile
+        self.quintile = quintile
         self.rebalance_freq = rebalance_freq
     
 
@@ -60,8 +60,8 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
 
         Computes the momentum signal for each ticker as the cumulative return
         over the window [T - lookback, T - skip], where T = as_of. Tickers
-        are ranked by this signal. The top decile is assigned equal positive
-        weights; the bottom decile is assigned equal negative weights.
+        are ranked by this signal. The top quintile is assigned equal positive
+        weights; the bottom quintile is assigned equal negative weights.
 
         The engine guarantees that prices contains only data up to and
         including as_of. No data beyond as_of is accessed.
@@ -111,12 +111,12 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
                 short_weights = pd.Series(dtype=float)
             )
         
-        # Check that universe is large enough to form deciles
-        q = int(len(momentum) * self.decile)
+        # Check that universe is large enough to form quintiles
+        q = int(len(momentum) * self.quintile)
         if q < 2:
             raise ValueError(
-                f"Universe too small to construct momentum deciles. "
-                f"Need at least {int(2 / self.decile)} tickers with valid signals, "
+                f"Universe too small to construct momentum quintiles. "
+                f"Need at least {int(2 / self.quintile)} tickers with valid signals, "
                 f"got {len(momentum)}."
             )
 
@@ -124,13 +124,13 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
         ranked = momentum.rank(method='first', ascending=False)
         n = len(momentum)
 
-        # Assign long weights to top decile
+        # Assign long weights to top quintile
         long_tickers = ranked[ranked <= q].index
-        long_weights = pd.Series(+1.0 / q, index=long_tickers)
+        long_weights = pd.Series(+0.5 / q, index=long_tickers)
 
-        # Assign short weights to bottom decile
+        # Assign short weights to bottom quintile
         short_tickers = ranked[ranked > n - q].index
-        short_weights = pd.Series(-1.0 / q, index=short_tickers)
+        short_weights = pd.Series(-0.5 / q, index=short_tickers)
         
         return PortfolioWeights(
             date = as_of,

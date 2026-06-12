@@ -9,7 +9,7 @@ import urllib.request
 from strategy_backtester.engine import BacktestEngine
 from strategy_backtester.strategies import RandomStrategy, CrossSectionalMomentumStrategy
 from strategy_backtester.data import load_data
-from strategy_backtester.validation import PermutationTest, IIDScheme, RanksScheme, BlockScheme
+from strategy_backtester.validation import PermutationTest, RankPermutationStrategy, IIDPermutationStrategy, BlockPermutationStrategy
 
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "configs", "config.yaml")
@@ -56,11 +56,11 @@ def build_strategy(cfg: dict):
 def build_scheme(cfg: dict):
     scheme_name = cfg["permutation"]["scheme"]
     if scheme_name == "ranks":
-        return RanksScheme()
+        return RankPermutationStrategy, {}
     elif scheme_name == "iid":
-        return IIDScheme()
+        return IIDPermutationStrategy, {}
     elif scheme_name == "block":
-        return BlockScheme(block_size=cfg["permutation"]["block_size"])
+        return BlockPermutationStrategy, {"block_size": cfg["permutation"]["block_size"]}
     else:
         raise ValueError(f"Unknown permutation scheme: {scheme_name}")
 
@@ -114,11 +114,11 @@ if __name__ == "__main__":
     t1 = time.perf_counter()
     engine = BacktestEngine(
         prices = prices,
+        strategy = build_strategy(cfg),
         metadata = metadata,
         initial_capital = bt["initial_capital"]
     )
-    strategy = build_strategy(cfg)
-    result = engine.run_backtest(strategy)
+    result = engine.run_backtest()
     print_result(to_label(bt["strategy"]), result)
     print(f"Backtest completed in {time.perf_counter() - t1:.2f} seconds.")
 
@@ -128,11 +128,13 @@ if __name__ == "__main__":
     print(f"\n\nRunning permutation test ({pm['scheme']}, N={pm['n']})...")
     print("This will take a few minutes.\n")
     t2 = time.perf_counter()
+    scheme_cls, scheme_kwargs = build_scheme(cfg)
 
     perm_test = PermutationTest(
         prices = prices,
         strategy = build_strategy(cfg),
-        scheme = build_scheme(cfg),
+        scheme_cls = scheme_cls,
+        scheme_kwargs = scheme_kwargs,
         N = pm["n"],
         metric = pm["metric"],
         initial_capital=bt["initial_capital"],

@@ -4,15 +4,18 @@ from strategy_backtester.data import PriceDataFrame, get_field
 from strategy_backtester.portfolio import PortfolioState
 from strategy_backtester.execution import execute
 from strategy_backtester.core import ExecutionResult, BacktestResult
+from strategy_backtester.strategies import BaseStrategy
 
 class BacktestEngine:
     def __init__(
             self,
             prices: PriceDataFrame,
+            strategy: BaseStrategy,
             metadata: dict = None,
             initial_capital: float = 100000.0
         ):
-        self.historical_data = prices
+        self.historical_data = strategy.prepare(prices)
+        self.strategy = strategy
         self.initial_capital = initial_capital
         self.metadata = metadata
 
@@ -23,7 +26,7 @@ class BacktestEngine:
         self.daily_turnover = []
 
 
-    def run_backtest(self, strategy) -> BacktestResult:
+    def run_backtest(self) -> BacktestResult:
         self._reset_state()
 
         unique_dates = self.historical_data.index.get_level_values(0).unique().sort_values()
@@ -49,13 +52,13 @@ class BacktestEngine:
             portfolio.update_to_market(close_prices = close_matrix.loc[current_date], date = current_date)
 
             #Check with strategy if we should trade today
-            if strategy.should_rebalance(
+            if self.strategy.should_rebalance(
                 date = current_date, 
                 last_rebalance = last_rebalance,
                 current_weights = portfolio.current_weights,
                 prices = current_prices
             ):
-                target_weights = strategy.generate(
+                target_weights = self.strategy.generate(
                     prices = current_prices,
                     as_of = current_date,
                     current_weights = portfolio.current_weights
