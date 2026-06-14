@@ -84,7 +84,8 @@ class BacktestEngine:
                     #Update portfolio
                     portfolio.update_to_execution(execution_result)
                     last_rebalance = current_date
-                    
+            
+                print(f"Date: {portfolio.date.date()}, Num Positions: {len(portfolio.positions)}, Total Value: ${portfolio.total_value:,.2f}")
             # Log daily returns, positions, costs, turnover
             self._log_day(date = current_date, portfolio = portfolio, execution_result = execution_result)
 
