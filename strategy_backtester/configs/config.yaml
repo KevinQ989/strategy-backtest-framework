@@ -47,6 +47,28 @@ permutation:
   n_jobs: 8        # -1 = all available cores
 
 
+# Walk-Foward configurations
+walk_forward:
+  win_in: 50
+  win_out: 50
+  cross_sectional_momentum:
+    lookback:
+      - 126
+      - 252
+      - 504
+    skip:
+      - 21
+      - 42
+    decile:
+      - 0.1
+      - 0.2
+      - 0.3
+    rebalance_freq:
+      - 21
+      - 42
+      - 63
+
+
 # Cost configurations for simulator
 execution:
   commission_bps: 5.0

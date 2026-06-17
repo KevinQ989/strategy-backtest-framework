@@ -77,4 +77,32 @@ class PermutationResult:
     p_value: float                          # One-tailed p-value of observed performance vs null
     metric: str                             # Performance metric used for evaluation
     N: int                                  # Number of permutations
-    scheme: str                             # Name of the permutation scheme used 
+    scheme: str                             # Name of the permutation scheme used
+
+
+# Result of in-sample validation handed to walk-forward fold
+@dataclass
+class ParamResult:
+    params: dict     # Hyperparameters used for backtest
+    is_metric: float # In-sample performance metric
+
+
+# Result of walk-forward fold handed to walk-forward test
+@dataclass
+class WalkForwardFold:
+    fold_idx: int                    # Index of the fold
+    is_start: pd.Timestamp           # Start date of in-sample period
+    is_end: pd.Timestamp             # End date of in-sample period
+    oos_start: pd.Timestamp          # Start date of out-of-sample period
+    oos_end: pd.Timestamp            # End date of out-of-sample period
+    param_results: list[ParamResult] # List of in-sample validation results for different hyperparameters
+    selected_params: dict            # Hyperparameters selected based on in-sample validation
+    oos_metric: float                # Out-of-sample metric for selected hyperparameters
+
+
+# Result of walk-forward test handed to validation
+@dataclass
+class WalkForwardResult:
+    scheme: str                  # Name of the walk-forward scheme used
+    metric: str                  # Performance metric used for evaluation
+    folds: list[WalkForwardFold] # List of walk-forward folds
