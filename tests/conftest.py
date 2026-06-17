@@ -43,6 +43,12 @@ def _make_ohlcv(
     Prices follow a GBM-like process so momentum signals are non-trivial.
     Each ticker has a distinct drift so cross-sectional spread exists.
     Volume is synthetic integer data.
+
+    Adj_Close is derived from Close by applying a synthetic 2:1 split
+    partway through the date range for the first ticker only (if there
+    are enough dates), so tests can exercise the case where Adj_Close
+    and Close diverge. For all other tickers, Adj_Close == Close
+    (no corporate actions).
     """
     rng = np.random.default_rng(seed)
     n_days = len(dates)
@@ -61,7 +67,14 @@ def _make_ohlcv(
     high = np.maximum(close, open_) + daily_range * 0.5
     low = np.minimum(close, open_) - daily_range * 0.5
     volume = rng.integers(500_000, 5_000_000, size=close.shape)
-
+    
+    # Adj_Close: unadjusted Close, retroactively adjusted for a synthetic
+    # 2:1 split on ticker 0 at the midpoint of the date range.
+    adj_close = close.copy()
+    if n_tickers > 0 and n_days > 1:
+        split_idx = n_days // 2
+        adj_close[:split_idx, 0] = adj_close[:split_idx, 0] / 2.0
+        
     rows = []
     for t_idx, ticker in enumerate(tickers):
         for d_idx, date in enumerate(dates):
@@ -72,6 +85,7 @@ def _make_ohlcv(
                 "High":   round(float(high[d_idx, t_idx]), 4),
                 "Low":    round(float(low[d_idx, t_idx]), 4),
                 "Close":  round(float(close[d_idx, t_idx]), 4),
+                "Adj_Close": round(float(adj_close[d_idx, t_idx]), 4),
                 "Volume": int(volume[d_idx, t_idx]),
             })
 
@@ -114,6 +128,7 @@ def mock_data_dict():
         "High":   [310.0, 315.0, 160.0, 165.0],
         "Low":    [295.0, 300.0, 145.0, 150.0],
         "Close":  [305.0, 310.0, 155.0, 160.0],
+        "Adj_Close": [304.0, 309.0, 154.5, 159.5],
         "Volume": [1000000, 1200000, 800000, 900000],
     }
 
@@ -136,6 +151,7 @@ def _make_yf_response(ticker: str, dates: pd.DatetimeIndex) -> pd.DataFrame:
     """
     df = _make_ohlcv(dates, [ticker])
     out = df.xs(ticker, level="Ticker").copy()
+    out = out.rename(columns={"Adj_Close": "Adj Close"})
     out.index.name = "Date"
     return out
 
@@ -146,7 +162,7 @@ def mock_yf_download(trading_dates):
     Monkeypatch yfinance.download to return synthetic data without hitting
     the network. Function-scoped so each test gets a clean call count.
     """
-    def _fake_download(ticker, start=None, end=None, auto_adjust=True, progress=False, **kwargs):
+    def _fake_download(ticker, start=None, end=None, auto_adjust=False, progress=False, **kwargs):
         dates = trading_dates
         if start is not None:
             dates = dates[dates >= pd.Timestamp(start)]

@@ -1,6 +1,5 @@
 from __future__ import annotations
 from functools import cached_property
-from strategy_backtester.data import PriceDataFrame, get_date
 from strategy_backtester.core import ExecutionResult
 import pandas as pd
 
@@ -136,7 +135,7 @@ class PortfolioState:
 
         # Update positions based on fills
         self.positions = self.positions.add(result.fills, fill_value=0.0)
-        self.positions = self.positions[self.positions != 0]
+        self.positions = self.positions[self.positions.abs() > 1e-8]
 
         # Update cash based on fills and costs
         fill_cost = (result.fills * result.execution_prices.reindex(result.fills.index)).sum()
