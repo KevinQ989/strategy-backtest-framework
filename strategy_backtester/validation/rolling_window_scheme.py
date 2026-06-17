@@ -21,4 +21,21 @@ class RollingWindowScheme(WindowScheme):
         self,
         prices: PriceDataFrame,
     ) -> list[tuple[pd.Timestamp, pd.Timestamp, pd.Timestamp, pd.Timestamp]]:
-        ...
+        dates = prices.index.get_level_values("Date").unique().sort_values()
+        folds = []
+        k = 1
+        while True:
+            is_start_idx  = (k - 1) * self.win_out
+            is_end_idx    = (k - 1) * self.win_out + self.win_in - 1
+            oos_start_idx = (k - 1) * self.win_out + self.win_in
+            oos_end_idx   = (k - 1) * self.win_out + self.win_in + self.win_out - 1
+            if oos_end_idx >= len(dates):
+                break
+            folds.append((
+                dates[is_start_idx],
+                dates[is_end_idx],
+                dates[oos_start_idx],
+                dates[oos_end_idx],
+            ))
+            k += 1
+        return folds
