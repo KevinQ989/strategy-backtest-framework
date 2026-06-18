@@ -4,7 +4,36 @@ from strategy_backtester.data import PriceDataFrame
 from abc import ABC, abstractmethod
 import pandas as pd
 
+
 class BaseStrategy(ABC):
+    def prepare(
+        self,
+        prices: PriceDataFrame
+    ) -> PriceDataFrame:
+        """
+        Apply preprocessing to the full price history before the backtest begins.
+
+        Called once by BacktestEngine at construction time, before any calls to
+        generate() or should_rebalance(). The default implementation is a no-op
+        passthrough; subclasses override this to transform prices ahead of the
+        simulation — for example, permutation-test wrappers that reshuffle
+        historical returns to construct a null price series.
+
+        Parameters
+        ----------
+        prices : PriceDataFrame
+            OHLCV price history for the entire backtest period, as loaded
+            (unfiltered by date).
+
+        Returns
+        -------
+        PriceDataFrame
+            Preprocessed price history, with the same schema as the input,
+            to be used as the historical data for the remainder of the backtest.
+        """
+        return prices
+    
+
     @abstractmethod
     def generate(
         self,
@@ -23,10 +52,9 @@ class BaseStrategy(ABC):
         ----------
         prices : PriceDataFrame
             OHLCV price history up to and including as_of.
-            MultiIndex (Date, Ticker) on rows. Columns: Open, High,
-            Low, Close, Volume (title case, flat — not a column MultiIndex).
+            MultiIndex (Date, Ticker) on rows.
+            Columns: Open, High, Low, Close, Volume, Adj_Close.
             Use get_field(prices, "Close") to get a (Date × Ticker) matrix.
-            Close prices are split and dividend adjusted (auto_adjust=True).
             Index is pd.DatetimeIndex, daily frequency, timezone-naive.
         as_of : pd.Timestamp
             Date T. Weights will be used to trade at T+1 open.

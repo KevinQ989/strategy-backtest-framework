@@ -6,7 +6,7 @@ from strategy_backtester.data import PriceDataFrame
 from strategy_backtester.engine import BacktestEngine
 from strategy_backtester.strategies import BaseStrategy
 from strategy_backtester.results import calc_sharpe_ratio
-from .permutation_schemes import BasePermutationScheme
+from .permutation_strategy import PermutationStrategyWrapper
 
 
 def _run_single_permutation(args: tuple) -> BacktestResult:
@@ -23,11 +23,11 @@ def _run_single_permutation(args: tuple) -> BacktestResult:
         BacktestResult
             The result of the backtest on the permuted data.
         """
-        prices, strategy, scheme, initial_capital, seed = args
+        prices, base_strategy, scheme_cls, scheme_kwargs, initial_capital, seed = args
         rng = np.random.default_rng(seed)
-        permuted_prices = scheme.permute(prices, rng)
-        engine = BacktestEngine(permuted_prices, initial_capital=initial_capital)
-        return engine.run_backtest(strategy)
+        wrapped_strategy = scheme_cls(base_strategy, rng, **scheme_kwargs)
+        engine = BacktestEngine(prices, wrapped_strategy, initial_capital=initial_capital)
+        return engine.run_backtest()
 
 
 class PermutationTest:
@@ -35,16 +35,18 @@ class PermutationTest:
         self,
         prices: PriceDataFrame,
         strategy: BaseStrategy,
-        scheme: BasePermutationScheme,
+        scheme_cls: type[PermutationStrategyWrapper],
+        scheme_kwargs: dict,
         N: int = 1000,
         metric: str = "sharpe",
         initial_capital: float = 100000.0,
         seed: int = 42,
-        n_jobs: int = 1
+        n_jobs: int = 1,
     ):
         self.prices = prices
         self.strategy = strategy
-        self.scheme = scheme
+        self.scheme_cls = scheme_cls
+        self.scheme_kwargs = scheme_kwargs
         self.N = N
         self.metric = metric
         self.initial_capital = initial_capital
@@ -57,15 +59,15 @@ class PermutationTest:
     def run(self) -> PermutationResult:
         #Run backtest on original data
         print("Running baseline backtest...")
-        engine = BacktestEngine(self.prices, initial_capital=self.initial_capital)
-        baseline_result = engine.run_backtest(self.strategy)
+        engine = BacktestEngine(self.prices, self.strategy, initial_capital=self.initial_capital)
+        baseline_result = engine.run_backtest()
         baseline_metric = self._calculate_metric(baseline_result)
 
         # Pre-generate seeds for parallel execution
         ss = np.random.SeedSequence(self.seed)
         child_seeds = [int(s.generate_state(1)[0]) for s in ss.spawn(self.N)]
         args = [
-            (self.prices, self.strategy, self.scheme, self.initial_capital, seed)
+            (self.prices, self.strategy, self.scheme_cls, self.scheme_kwargs, self.initial_capital, seed)
             for seed in child_seeds
         ]
 
@@ -101,7 +103,7 @@ class PermutationTest:
             p_value = p_value,
             metric = self.metric,
             N = self.N,
-            scheme = self.scheme.__class__.__name__
+            scheme = self.scheme_cls.__name__
         )
         return self.permutation_results
     

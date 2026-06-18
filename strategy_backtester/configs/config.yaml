@@ -3,8 +3,8 @@ backtest:
   strategy: "cross_sectional_momentum" # Options: "random", "cross_sectional_momentum"
   initial_capital: 1_000_000.0
   start_date: "2018-01-01"
-  end_date: "2023-12-31"
-  universe: "" # Options: "sp500", "" (uses tickers list below)
+  end_date: "2025-12-31"
+  universe: "sp500" # Options: "sp500", "" (uses tickers list below)
   tickers:
     - "AAPL"  # Apple Inc.
     - "MSFT"  # Microsoft Corporation
@@ -33,13 +33,13 @@ strategies:
   cross_sectional_momentum:
     lookback: 252
     skip: 21
-    decile: 0.2
+    percent: 0.1
     rebalance_freq: 21
 
 
 # Permutation configurations
 permutation:
-  n: 1000
+  n: 10
   scheme: "ranks"  # Options: "ranks", "iid", "block"
   block_size: 21
   metric: "sharpe" # Options: "sharpe"

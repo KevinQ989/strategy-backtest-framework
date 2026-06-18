@@ -4,7 +4,7 @@ import pandas as pd
 
 
 PriceDataFrame = NewType("PriceDataFrame", pd.DataFrame)
-PRICE_FIELDS = ["Open", "High", "Low", "Close", "Volume"]
+PRICE_FIELDS = ["Open", "High", "Low", "Close", "Volume", "Adj_Close"]
 
 
 def make_price_dataframe(df: pd.DataFrame) -> PriceDataFrame:
@@ -16,7 +16,7 @@ def make_price_dataframe(df: pd.DataFrame) -> PriceDataFrame:
     Index: pd.MultiIndex with levels (Date, Ticker)
         Date - pd.Timestamp, timezone-naive
         Ticker - str
-    Columns: Open, High, Low, Close, Volume
+    Columns: Open, High, Low, Close, Volume, Adj_Close
     Values: float64 for price fields, int64 for volume
 
     Raises
@@ -27,7 +27,7 @@ def make_price_dataframe(df: pd.DataFrame) -> PriceDataFrame:
     # Check MultiIndex structure
     if not isinstance(df.index, pd.MultiIndex):
         raise TypeError(
-            f"Expected MultiIndex with levels (Date, Ticker), got {type(df.index)}."
+            f"Expected MultiIndex with levels (Date, Ticker), got {type(df.index)}. "
             f"Use df.set_index(['Date', 'Ticker'], inplace=True) to set the index."
         )
     if len(df.index.levels) != 2:
@@ -39,12 +39,12 @@ def make_price_dataframe(df: pd.DataFrame) -> PriceDataFrame:
     date_level = df.index.get_level_values(0)
     if not isinstance(date_level, pd.DatetimeIndex):
         raise TypeError(
-            f"Expected first index level to be Date (pd.Timestamp), got {type(date_level)}."
+            f"Expected first index level to be Date (pd.Timestamp), got {type(date_level)}. "
             f"Use pd.to_datetime() to convert to datetime."
         )
     if date_level.tz is not None:
         raise TypeError(
-            "Expected timezone-naive Date index, but timezone information was found."
+            "Expected timezone-naive Date index, but timezone information was found. "
             "Use df.index = df.index.set_levels(df.index.levels[0].tz_localize(None), level=0) to remove timezone information."
         )
     
@@ -52,7 +52,7 @@ def make_price_dataframe(df: pd.DataFrame) -> PriceDataFrame:
     ticker_level = df.index.get_level_values(1)
     if not all(isinstance(t, str) for t in ticker_level.unique()):
         raise TypeError(
-            f"Expected second index level to be Ticker (str), but found non-string values."
+            f"Expected second index level to be Ticker (str), but found non-string values. "
             f"Use df.index = df.index.set_levels(df.index.levels[1].astype(str), level=1) to convert to string."
         )
     
@@ -60,21 +60,21 @@ def make_price_dataframe(df: pd.DataFrame) -> PriceDataFrame:
     missing_cols = set(PRICE_FIELDS) - set(df.columns)
     if missing_cols:
         raise ValueError(
-            f"Missing required columns: {missing_cols}"
+            f"Missing required columns: {missing_cols} "
             f"Ensure the DataFrame contains the following columns: {PRICE_FIELDS}"
         )
     
     # Check for duplicate keys
     if df.index.duplicated().any():
         raise ValueError(
-            "Duplicate keys found in MultiIndex. Each (Date, Ticker) pair must be unique."
+            "Duplicate keys found in MultiIndex. Each (Date, Ticker) pair must be unique. "
             "Use df.index.duplicated() to identify duplicates and resolve them."
         )
     
     # Check for NaN values
     if df.isna().any().any():
         raise ValueError(
-            "NaN values found in DataFrame. All price and volume fields must be complete."
+            "NaN values found in DataFrame. All price and volume fields must be complete. "
             "Use df.isna().sum() to identify columns with NaN values and handle them appropriately."
         )
     
@@ -87,7 +87,7 @@ def make_price_dataframe(df: pd.DataFrame) -> PriceDataFrame:
         
         if df[col].dtype != expected_dtype:
             raise TypeError(
-                f"Column '{col}' has incorrect dtype. Expected {expected_dtype}, got {df[col].dtype}."
+                f"Column '{col}' has incorrect dtype. Expected {expected_dtype}, got {df[col].dtype}. "
                 f"Use df['{col}'] = df['{col}'].astype({expected_dtype}) to convert the column to the correct dtype."
             )
     
@@ -118,7 +118,7 @@ def get_field(price_df: PriceDataFrame, field: str) -> pd.DataFrame:
     """
     if field not in price_df.columns:
         raise ValueError(
-            f"Field '{field}' not found in PriceDataFrame columns."
+            f"Field '{field}' not found in PriceDataFrame columns. "
             f"Available fields are: {price_df.columns.tolist()}"
         )
     
@@ -140,7 +140,7 @@ def get_date(price_df: PriceDataFrame, date: pd.Timestamp) -> pd.DataFrame:
     -------
     pd.DataFrame
         Index: Ticker (str)
-        Columns: Open, High, Low, Close, Volume for the specified date.
+        Columns: Open, High, Low, Close, Volume, Adj_Close for the specified date.
 
     Raises
     ------
@@ -148,7 +148,7 @@ def get_date(price_df: PriceDataFrame, date: pd.Timestamp) -> pd.DataFrame:
     """
     if date not in price_df.index.get_level_values(0):
         raise ValueError(
-            f"Date '{date}' not found in PriceDataFrame index."
+            f"Date '{date}' not found in PriceDataFrame index. "
             f"Available dates are: {price_df.index.get_level_values(0).unique().tolist()}"
         )
     
@@ -170,7 +170,7 @@ def get_ticker(price_df: PriceDataFrame, ticker: str) -> pd.DataFrame:
     -------
     pd.DataFrame
         Index: Date (pd.Timestamp)
-        Columns: Open, High, Low, Close, Volume for the specified ticker.
+        Columns: Open, High, Low, Close, Volume, Adj_Close for the specified ticker.
 
     Raises
     ------
@@ -178,7 +178,7 @@ def get_ticker(price_df: PriceDataFrame, ticker: str) -> pd.DataFrame:
     """
     if ticker not in price_df.index.get_level_values(1):
         raise ValueError(
-            f"Ticker '{ticker}' not found in PriceDataFrame index."
+            f"Ticker '{ticker}' not found in PriceDataFrame index. "
             f"Available tickers are: {price_df.index.get_level_values(1).unique().tolist()}"
         )
     
