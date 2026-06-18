@@ -3,8 +3,8 @@ import pandas as pd
 import pytest
 from unittest.mock import MagicMock
 from strategy_backtester.core import BacktestResult, PermutationResult
-from strategy_backtester.validation.permutation import PermutationTest
 from strategy_backtester.validation import (
+    PermutationTest,
     IIDPermutationStrategy,
     BlockPermutationStrategy,
     RankPermutationStrategy,
