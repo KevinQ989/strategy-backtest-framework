@@ -20,6 +20,10 @@ class WindowScheme(ABC):
         between consecutive folds.
     """
     def __init__(self, win_in: int, win_out: int) -> None:
+        if win_in <= 0:
+            raise ValueError(f"win_in must be positive, got {win_in}.")
+        if win_out <= 0:
+            raise ValueError(f"win_out must be positive, got {win_out}.")
         self.win_in = win_in
         self.win_out = win_out
 
