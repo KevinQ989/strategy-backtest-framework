@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from strategy_backtester.data import get_field
 from strategy_backtester.strategies import RandomStrategy
-from strategy_backtester.validation.iid_permutation_strategy import IIDPermutationStrategy
+from strategy_backtester.validation import IIDPermutationStrategy
 
 
 SEED = 42

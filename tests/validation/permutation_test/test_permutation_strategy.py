@@ -2,7 +2,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from strategy_backtester.strategies import RandomStrategy, CrossSectionalMomentumStrategy
-from strategy_backtester.validation.permutation_strategy import PermutationStrategyWrapper
+from strategy_backtester.validation import PermutationStrategyWrapper
 
 
 # ---------------------------------------------------------------------------

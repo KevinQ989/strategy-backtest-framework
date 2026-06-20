@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from strategy_backtester.strategies import RandomStrategy, CrossSectionalMomentumStrategy
-from strategy_backtester.validation.rank_permutation_strategy import RankPermutationStrategy
+from strategy_backtester.validation import RankPermutationStrategy
 
 
 LOOKBACK, SKIP, PERCENT, REBALANCE_FREQ = 252, 21, 0.1, 21

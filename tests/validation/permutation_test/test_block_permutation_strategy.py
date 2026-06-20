@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from strategy_backtester.data import get_field
 from strategy_backtester.strategies import RandomStrategy
-from strategy_backtester.validation.block_permutation_strategy import BlockPermutationStrategy
+from strategy_backtester.validation import BlockPermutationStrategy
 
 
 SEED = 42
@@ -210,7 +210,7 @@ def test_block_larger_than_series_does_not_crash(price_df):
 def test_block_shuffle_differs_from_iid_shuffle(price_df):
     """Sanity check: with the same seed, block-shuffle output differs from a
     fully independent per-day shuffle (different reconstructed price paths)."""
-    from strategy_backtester.validation.iid_permutation_strategy import IIDPermutationStrategy
+    from strategy_backtester.validation import IIDPermutationStrategy
 
     block_result = BlockPermutationStrategy(RandomStrategy(), _rng(SEED), block_size=20).prepare(price_df)
     iid_result = IIDPermutationStrategy(RandomStrategy(), _rng(SEED)).prepare(price_df)

@@ -28,6 +28,14 @@ backtest:
     - "LLY"   # Eli Lilly and Company
 
 
+# Cost configurations for simulator
+execution:
+  commission_bps: 5.0
+  spread_bps: 5.0
+  slippage_k: 0.1
+  adv_window: 20
+
+
 # Strategy configurations
 strategies:
   cross_sectional_momentum:
@@ -39,7 +47,7 @@ strategies:
 
 # Permutation configurations
 permutation:
-  n: 10
+  n: 1000
   scheme: "ranks"  # Options: "ranks", "iid", "block"
   block_size: 21
   metric: "sharpe" # Options: "sharpe"
@@ -47,9 +55,26 @@ permutation:
   n_jobs: 8        # -1 = all available cores
 
 
-# Cost configurations for simulator
-execution:
-  commission_bps: 5.0
-  spread_bps: 5.0
-  slippage_k: 0.1
-  adv_window: 20
+# Walk-Foward configurations
+walk_forward:
+  win_in: 504
+  win_out: 252
+  scheme: "expanding" # Options: "expanding", "rolling"
+  metric: "sharpe"    # Options: "sharpe"
+  n_jobs: 8           # -1 = all available cores
+  cross_sectional_momentum:
+    lookback:
+      - 126
+      - 252
+      - 504
+    skip:
+      - 21
+      - 42
+    percent:
+      - 0.1
+      - 0.2
+      - 0.3
+    rebalance_freq:
+      - 21
+      - 42
+      - 63
