@@ -6,6 +6,7 @@ import io
 import time
 import pickle
 import urllib.request
+import argparse
 from strategy_backtester.data import load_data
 from strategy_backtester.engine import BacktestEngine
 from strategy_backtester.strategies import(
@@ -25,6 +26,16 @@ from strategy_backtester.results import (
     generate_dashboard,
     generate_tear_sheet,
 )
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Strategy backtester")
+    parser.add_argument(
+        "--cached", "-c",
+        action="store_true",
+        help="Skip all computation and load results from cache pkl files."
+    )
+    return parser.parse_args()
 
 
 # ------------------------------------------------------------------
@@ -118,109 +129,131 @@ def build_param_grid(cfg: dict) -> dict[str, list]:
 
 
 if __name__ == "__main__":
+    args = parse_args()
     cfg = load_config()
     bt = cfg["backtest"]
     pm = cfg["permutation"]
     wf = cfg["walk_forward"]
 
-    # ------------------------------------------------------------------
-    # Create cache directory if it doesn't exist
-    # ------------------------------------------------------------------
     cache_dir = os.path.join(os.path.dirname(__file__), "cache")
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
-        print(f"Created cache directory at {cache_dir}\n")
-
-    # ------------------------------------------------------------------
-    # Load data
-    # ------------------------------------------------------------------
-    print("Loading price data...")
-    t0 = time.perf_counter()
-    tickers = build_universe(cfg)
-    prices = load_data(
-        tickers = tickers,
-        start_date = bt["start_date"],
-        end_date = bt["end_date"]
-    )
-    print(f"Loaded {len(prices.index.get_level_values('Date').unique())} trading days "
-          f"for {len(tickers)} tickers.\n")
-    print(f"Data loaded in {time.perf_counter() - t0:.2f} seconds.")
-    metadata = {
-        "tickers":         tickers,
-        "start_date":      bt["start_date"],
-        "end_date":        bt["end_date"],
-        "initial_capital": bt["initial_capital"],
-        "strategy":        bt["strategy"],
-    }
-
-
-    # ------------------------------------------------------------------
-    # Backtest
-    # ------------------------------------------------------------------
-    print("Running backtest...")
-    t1 = time.perf_counter()
-    engine = BacktestEngine(
-        prices = prices,
-        strategy = build_strategy(cfg),
-        metadata = metadata,
-        initial_capital = bt["initial_capital"]
-    )
-    result = engine.run_backtest()
-    print(f"Backtest completed in {time.perf_counter() - t1:.2f} seconds.")
-
-
-    # ------------------------------------------------------------------
-    # Permutation test
-    # ------------------------------------------------------------------
-    print(f"\n\nRunning permutation test ({pm['scheme']}, N={pm['n']})...")
-    print("This will take a few minutes.\n")
-    t2 = time.perf_counter()
-    scheme_cls, scheme_kwargs = build_perm_scheme(cfg)
-
-    perm_test = PermutationTest(
-        prices = prices,
-        strategy = build_strategy(cfg),
-        scheme_cls = scheme_cls,
-        scheme_kwargs = scheme_kwargs,
-        N = pm["n"],
-        metric = pm["metric"],
-        initial_capital=bt["initial_capital"],
-        seed = pm["seed"],
-        n_jobs = pm["n_jobs"]
-    )
-    perm_results = perm_test.run()
-
-    # Cache permutation test results
+    backtest_data_path = os.path.join(cache_dir, "backtest_results.pkl")
     perm_test_data_path = os.path.join(cache_dir, "perm_results.pkl")
-    with open(perm_test_data_path, "wb") as file:
-        pickle.dump(perm_results, file)
-    print("Permutation test data saved successfully.")
-    print(f"Permutation test completed in {time.perf_counter() - t2:.2f} seconds.")
-
-
-    # ------------------------------------------------------------------
-    # Walk forward validation
-    # ------------------------------------------------------------------
-    print(f"\n\nRunning walk-forward validation...")
-    print("This will take a few minutes.\n")
-    t3 = time.perf_counter()
-    wfv = WalkForwardTest(
-        prices = prices,
-        strategy_cls = _STRATEGY_CLASSES[bt["strategy"]],
-        param_grid = build_param_grid(cfg),
-        scheme = build_wf_scheme(cfg),
-        metric = wf["metric"],
-        initial_capital = bt["initial_capital"],
-        n_jobs = wf["n_jobs"]
-    )
-    wfv_results = wfv.run()
-
-    # Cache walk-forward validation results
     wfv_data_path = os.path.join(cache_dir, "wfv_results.pkl")
-    with open(wfv_data_path, "wb") as file:
-        pickle.dump(wfv_results, file)
-    print("Walk-forward validation data saved successfully.")
-    print(f"Walk-forward validation completed in {time.perf_counter() - t3:.2f} seconds.")
+
+    if args.cached:
+        missing = [p for p in [backtest_data_path, perm_test_data_path, wfv_data_path]
+                   if not os.path.exists(p)]
+        if missing:
+            raise FileNotFoundError(
+                f"--cached specified but the following cache files are missing:\n"
+                + "\n".join(missing)
+            )
+        print("Loading results from cache...")
+        with open(backtest_data_path, "rb") as f:
+            result = pickle.load(f)
+        with open(perm_test_data_path, "rb") as f:
+            perm_results = pickle.load(f)
+        with open(wfv_data_path, "rb") as f:
+            wfv_results = pickle.load(f)
+        print("Cache loaded.\n")
+
+    else:
+        # ------------------------------------------------------------------
+        # Load data
+        # ------------------------------------------------------------------
+        print("Loading price data...")
+        t0 = time.perf_counter()
+        tickers = build_universe(cfg)
+        prices = load_data(
+            tickers = tickers,
+            start_date = bt["start_date"],
+            end_date = bt["end_date"]
+        )
+        print(f"Loaded {len(prices.index.get_level_values('Date').unique())} trading days "
+            f"for {len(tickers)} tickers.\n")
+        print(f"Data loaded in {time.perf_counter() - t0:.2f} seconds.")
+        metadata = {
+            "tickers":         tickers,
+            "start_date":      bt["start_date"],
+            "end_date":        bt["end_date"],
+            "initial_capital": bt["initial_capital"],
+            "strategy":        bt["strategy"],
+        }
+
+
+        # ------------------------------------------------------------------
+        # Backtest
+        # ------------------------------------------------------------------
+        print("Running backtest...")
+        t1 = time.perf_counter()
+        engine = BacktestEngine(
+            prices = prices,
+            strategy = build_strategy(cfg),
+            metadata = metadata,
+            initial_capital = bt["initial_capital"]
+        )
+        result = engine.run_backtest()
+
+        # Cache backtest results
+        backtest_data_path = os.path.join(cache_dir, "backtest_results.pkl")
+        with open(backtest_data_path, "wb") as file:
+            pickle.dump(result, file)
+        print("Backtest data saved successfully.")
+        print(f"Backtest completed in {time.perf_counter() - t1:.2f} seconds.")
+
+
+        # ------------------------------------------------------------------
+        # Permutation test
+        # ------------------------------------------------------------------
+        print(f"\n\nRunning permutation test ({pm['scheme']}, N={pm['n']})...")
+        print("This will take a few minutes.\n")
+        t2 = time.perf_counter()
+        scheme_cls, scheme_kwargs = build_perm_scheme(cfg)
+
+        perm_test = PermutationTest(
+            prices = prices,
+            strategy = build_strategy(cfg),
+            scheme_cls = scheme_cls,
+            scheme_kwargs = scheme_kwargs,
+            N = pm["n"],
+            metric = pm["metric"],
+            initial_capital=bt["initial_capital"],
+            seed = pm["seed"],
+            n_jobs = pm["n_jobs"]
+        )
+        perm_results = perm_test.run()
+
+        # Cache permutation test results
+        perm_test_data_path = os.path.join(cache_dir, "perm_results.pkl")
+        with open(perm_test_data_path, "wb") as file:
+            pickle.dump(perm_results, file)
+        print("Permutation test data saved successfully.")
+        print(f"Permutation test completed in {time.perf_counter() - t2:.2f} seconds.")
+
+
+        # ------------------------------------------------------------------
+        # Walk forward validation
+        # ------------------------------------------------------------------
+        print(f"\n\nRunning walk-forward validation...")
+        print("This will take a few minutes.\n")
+        t3 = time.perf_counter()
+        wfv = WalkForwardTest(
+            prices = prices,
+            strategy_cls = _STRATEGY_CLASSES[bt["strategy"]],
+            param_grid = build_param_grid(cfg),
+            scheme = build_wf_scheme(cfg),
+            metric = wf["metric"],
+            initial_capital = bt["initial_capital"],
+            n_jobs = wf["n_jobs"]
+        )
+        wfv_results = wfv.run()
+
+        # Cache walk-forward validation results
+        wfv_data_path = os.path.join(cache_dir, "wfv_results.pkl")
+        with open(wfv_data_path, "wb") as file:
+            pickle.dump(wfv_results, file)
+        print("Walk-forward validation data saved successfully.")
+        print(f"Walk-forward validation completed in {time.perf_counter() - t3:.2f} seconds.")
 
 
     # ------------------------------------------------------------------

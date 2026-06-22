@@ -19,12 +19,8 @@ from .metrics import (
 # ------------------------------------------------------------------
 
 
-def _to_label(name: str) -> str:
-    return name.replace("_", " ").title()
-
-
-def _print_backtest_result(label: str, result: BacktestResult) -> None:
-    print(f"\n--- {label} ---")
+def _print_backtest_result(result: BacktestResult) -> None:
+    print("\n--- Backtest Results ---")
     print(f"  Final portfolio value:  ${calc_final_value(result.starting_capital, result.returns):<12,.2f}")
     print(f"  Cumulative return:      {calc_cumulative_return(result.returns):<12.2%}")
     print(f"  Annualised return:      {calc_annualised_return(result.starting_capital, result.returns):<12.2%}")
@@ -103,6 +99,6 @@ def generate_tear_sheet(
     output_dir : str
         Directory where the tear sheet will be saved (default is "tearsheet").
     """
-    _print_backtest_result(_to_label(cfg["backtest"]["strategy"]), backtest_results)
+    _print_backtest_result(backtest_results)
     _print_permutation_result(permutation_result)
     _print_wf_result(wf_result)
