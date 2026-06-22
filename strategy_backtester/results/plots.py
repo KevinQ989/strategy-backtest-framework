@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from strategy_backtester.core import PermutationResult, BacktestResult
 
-def plot_dashboard(perm_result: PermutationResult, rolling_window: int = 126):
+def generate_dashboard(perm_result: PermutationResult, rolling_window: int = 126):
     """
     Generates a 2x2 dashboard to contain all plots. 
 
