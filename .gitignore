@@ -38,7 +38,10 @@ coverage.xml
 .pytest_cache/
 cover/
 
-#Virtual environment
+# Virtual environment
 venv/
 .venv/
 env/
+
+# Results
+cache/

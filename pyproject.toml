@@ -9,6 +9,8 @@ description = "Strategy backtest framework for testing and evaluating trading st
 requires-python = ">=3.9"
 dependencies = [
     "numpy",
+    "matplotlib",
+    "seaborn",
     "yfinance",
     "pandas",
     "pyyaml",

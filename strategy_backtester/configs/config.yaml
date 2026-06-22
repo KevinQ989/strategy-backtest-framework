@@ -55,6 +55,19 @@ permutation:
   n_jobs: 8        # -1 = all available cores
 
 
+# Cost configurations for simulator
+execution:
+  commission_bps: 5.0
+  spread_bps: 5.0
+  slippage_k: 0.1
+  adv_window: 20
+
+
+#Dashboard configurations
+dashboard:
+  rolling_sharpe_window: 126
+
+
 # Walk-Foward configurations
 walk_forward:
   win_in: 504
