@@ -6,7 +6,9 @@ from strategy_backtester.data import PriceDataFrame, get_field
 from strategy_backtester.core import PortfolioWeights, ExecutionResult
 from strategy_backtester.portfolio import PortfolioState
 
-BPS = 1e-4
+BPS = 1e-4                # One basis point — used in cost computations
+_TRADE_THRESHOLD = 1e-4   # Minimum weight delta to execute a new trade (1 bps)
+_CLOSE_THRESHOLD = 1e-6   # Weight residual below which a position is treated as closed
 
 # Load execution parameters from config.yaml
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "configs", "config.yaml")
@@ -71,7 +73,9 @@ def execute(
     current = current.reindex(all_tickers, fill_value=0.0)
 
     weight_delta = target - current
-    weight_delta = weight_delta[weight_delta.abs() > BPS]
+    is_closing = (target.abs() <= _CLOSE_THRESHOLD) & (current.abs() > _CLOSE_THRESHOLD)
+    is_meaningful = weight_delta.abs() > _TRADE_THRESHOLD
+    weight_delta = weight_delta[is_meaningful | is_closing]
     if weight_delta.empty:
         return _no_trade_result(date)
 
@@ -84,6 +88,12 @@ def execute(
     # Convert weight deltas to shares
     trade_values = weight_delta * total_value
     fills_shares = trade_values / exec_prices
+
+    closing_mask = is_closing.reindex(weight_delta.index, fill_value = False)
+    if closing_mask.any():
+        closing_tickers = closing_mask[closing_mask].index
+        fills_shares[closing_tickers] = -state.positions.reindex(closing_tickers, fill_value=0.0)
+        trade_values[closing_tickers] = fills_shares[closing_tickers] * exec_prices[closing_tickers]
 
     # Compute costs
     abs_trade_values = trade_values.abs()

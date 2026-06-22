@@ -174,7 +174,7 @@ def _download(
         ticker,
         start=start_ts,
         end=end_ts + pd.Timedelta(days=1),
-        auto_adjust=True,
+        auto_adjust=False,
         progress=False
     )
     if raw.empty:
@@ -184,6 +184,7 @@ def _download(
     raw.index.name = "Date"
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = raw.columns.get_level_values(0)
+    raw = raw.rename(columns={"Adj Close": "Adj_Close"})
     raw = raw[[f for f in PRICE_FIELDS if f in raw.columns]].copy()
     raw["Volume"] = raw["Volume"].astype('int64')
     raw["Ticker"] = ticker

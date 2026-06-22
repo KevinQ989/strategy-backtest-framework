@@ -28,3 +28,10 @@ include = ["strategy_backtester*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.coverage.run]
+omit = [
+    "*/__init__.py",
+    "strategy_backtester/strategies/*",
+    "strategy_backtester/main.py",
+]
