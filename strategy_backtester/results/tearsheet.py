@@ -1,8 +1,16 @@
 from __future__ import annotations
+import numpy as np
 from strategy_backtester.core import (
     BacktestResult,
     PermutationResult,
     WalkForwardResult,
+)
+from .metrics import (
+    calc_cumulative_return,
+    calc_final_value,
+    calc_annualised_return,
+    calc_annualised_volatility,
+    calc_sharpe_ratio,
 )
 
 
@@ -17,19 +25,19 @@ def _to_label(name: str) -> str:
 
 def _print_backtest_result(label: str, result: BacktestResult) -> None:
     print(f"\n--- {label} ---")
-    print(f"  Final portfolio value:  ${result.final_value:<12,.2f}")
-    print(f"  Cumulative return:      {result.cumulative_return:<12.2%}")
-    print(f"  Annualised return:      {result.annualised_return:<12.2%}")
-    print(f"  Annualised volatility:  {result.annualised_volatility:<12.2%}")
-    print(f"  Sharpe ratio:           {result.sharpe_ratio:<12.2f}")
+    print(f"  Final portfolio value:  ${calc_final_value(result.starting_capital, result.returns):<12,.2f}")
+    print(f"  Cumulative return:      {calc_cumulative_return(result.returns):<12.2%}")
+    print(f"  Annualised return:      {calc_annualised_return(result.starting_capital, result.returns):<12.2%}")
+    print(f"  Annualised volatility:  {calc_annualised_volatility(result.returns):<12.2%}")
+    print(f"  Sharpe ratio:           {calc_sharpe_ratio(result.returns):<12.2f}")
 
 
 def _print_permutation_result(result: PermutationResult) -> None:
-    null_sharpes = [r.sharpe_ratio for r in result.null_distribution]
+    null_sharpes = [calc_sharpe_ratio(r.returns) for r in result.null_distribution]
     print("\n--- Permutation Test Results ---")
     print(f"  Scheme:                 {result.scheme}")
     print(f"  N permutations:         {result.N:<8d}")
-    print(f"  Baseline Sharpe:        {result.baseline.sharpe_ratio:<8.2f}")
+    print(f"  Baseline Sharpe:        {calc_sharpe_ratio(result.baseline.returns):<8.2f}")
     print(f"  Mean null Sharpe:       {np.mean(null_sharpes):<8.2f}")
     print(f"  Null Sharpe std:        {np.std(null_sharpes):<8.2f}")
     print(f"  p-value (one-tailed):   {result.p_value:<8.4f}")

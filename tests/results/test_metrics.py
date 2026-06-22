@@ -1,6 +1,6 @@
-import strategy_backtester.results.metrics as metrics
 import pandas as pd
 import pytest
+import strategy_backtester.results.metrics as metrics
 
 
 @pytest.fixture

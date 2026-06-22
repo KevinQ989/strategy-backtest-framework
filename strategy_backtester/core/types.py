@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import pandas as pd
-from strategy_backtester.results import metrics
+
 
 # Result of strategies handed to portfolio
 @dataclass
@@ -32,7 +32,6 @@ class ExecutionResult:
     commission: float  # Commission component of costs
     spread: float      # Spread component of costs
 
-
     @property
     def total_cost(self) -> float:
         return self.slippage + self.commission + self.spread
@@ -47,26 +46,6 @@ class BacktestResult:
     turnover: pd.Series     # Daily turnover, index = date
     starting_capital: float # Initial capital
     metadata: dict          # Config snapshot
-
-    @property
-    def final_value(self):
-        return metrics.calc_final_value(self.starting_capital, self.returns)
-
-    @property
-    def cumulative_return(self):
-        return metrics.calc_cumulative_return(self.returns)
-    
-    @property
-    def annualised_return(self):
-        return metrics.calc_annualised_return(self.starting_capital, self.returns)
-    
-    @property
-    def annualised_volatility(self):
-        return metrics.calc_annualised_volatility(self.returns)
-    
-    @property
-    def sharpe_ratio(self):
-        return metrics.calc_sharpe_ratio(self.returns)
 
 
 # Result of permutation test handed to validation

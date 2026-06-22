@@ -1,6 +1,6 @@
 import pickle
 import os
-from strategy_backtester.results.plots import plot_dashboard
+from strategy_backtester.results import generate_dashboard
 
 if __name__ == "__main__": 
     current_folder = os.path.dirname(__file__)
@@ -16,4 +16,4 @@ if __name__ == "__main__":
         exit()
 
     print("Test data loaded. Generating dashboard...")
-    plot_dashboard(cached_results, rolling_window = 126)
+    generate_dashboard(cached_results, rolling_window = 126)
