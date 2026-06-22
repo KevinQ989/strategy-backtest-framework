@@ -192,6 +192,14 @@ if __name__ == "__main__":
     wf = cfg["walk_forward"]
 
     # ------------------------------------------------------------------
+    # Create cache directory if it doesn't exist
+    # ------------------------------------------------------------------
+    cache_dir = os.path.join(os.path.dirname(__file__), "cache")
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+        print(f"Created cache directory at {cache_dir}\n")
+
+    # ------------------------------------------------------------------
     # Load data
     # ------------------------------------------------------------------
     print("Loading price data...")
@@ -251,18 +259,17 @@ if __name__ == "__main__":
     )
     perm_results = perm_test.run()
 
-    #Extract permutation data so we don't have to run permutations to test the dashboard
-    root_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    perm_test_data_path = os.path.join(root_folder, "tests", "results", "perm_test_data.pkl")
+    # Cache permutation test results
+    perm_test_data_path = os.path.join(cache_dir, "perm_results.pkl")
     with open(perm_test_data_path, "wb") as file:
         pickle.dump(perm_results, file)
-    print("Test data saved successfully.")
+    print("Permutation test data saved successfully.")
 
     # ------------------------------------------------------------------
     # Dashboard
     # ------------------------------------------------------------------
     print("Generating Dashboard...")
-    plot_dashboard(perm_results, cfg['dashboard']['rolling_sharpe_window'])
+    # plot_dashboard(perm_results, cfg['dashboard']['rolling_sharpe_window'])
     print_permutation_result(perm_results)
     print(f"Permutation test completed in {time.perf_counter() - t2:.2f} seconds.")
 
@@ -283,5 +290,12 @@ if __name__ == "__main__":
         n_jobs = wf["n_jobs"]
     )
     wfv_results = wfv.run()
+
+    # Cache walk-forward validation results
+    wfv_data_path = os.path.join(cache_dir, "wfv_results.pkl")
+    with open(wfv_data_path, "wb") as file:
+        pickle.dump(wfv_results, file)
+    print("Walk-forward validation data saved successfully.")
+
     print_wf_result(wfv_results)
     print(f"Walk-forward validation completed in {time.perf_counter() - t3:.2f} seconds.")

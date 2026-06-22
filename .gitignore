@@ -38,10 +38,10 @@ coverage.xml
 .pytest_cache/
 cover/
 
-#Virtual environment
+# Virtual environment
 venv/
 .venv/
 env/
 
-#Dashboard tests
-tests/results/perm_test_data.pkl
+# Results
+cache/
