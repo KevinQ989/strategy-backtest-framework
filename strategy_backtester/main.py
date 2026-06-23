@@ -339,4 +339,4 @@ if __name__ == "__main__":
     # print("\nGenerating dashboard...")
     # generate_dashboard(perm_result, cfg["dashboard"]["rolling_sharpe_window"])
     print("Generating tear sheet...")
-    generate_tear_sheet(result, perm_result, wfv_result)
+    generate_tear_sheet(result, perm_result, wfv_result, cfg)

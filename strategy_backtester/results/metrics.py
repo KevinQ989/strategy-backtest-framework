@@ -35,3 +35,27 @@ def calc_sharpe_ratio(returns: pd.Series) -> float:
     daily_rf = 0.04 / 252
     excess_returns = returns - daily_rf
     return (excess_returns.mean() / returns.std() )* np.sqrt(252)
+
+
+def calc_sortino_ratio(returns: pd.Series) -> float:
+    pass
+
+
+def calc_max_drawdown(returns: pd.Series) -> float:
+    pass
+
+
+def calc_max_drawdown_duration(returns: pd.Series) -> int:
+    pass
+
+
+def calc_win_rate(returns: pd.Series) -> float:
+    pass
+
+
+def calc_rolling_drawdown(returns: pd.Series) -> pd.Series:
+    pass
+
+
+def calc_cumulative_returns_series(returns: pd.Series) -> pd.Series:
+    pass

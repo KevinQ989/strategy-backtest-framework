@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import numpy as np
 from strategy_backtester.core import (
     BacktestResult,
@@ -11,92 +12,219 @@ from .metrics import (
     calc_annualised_return,
     calc_annualised_volatility,
     calc_sharpe_ratio,
+    calc_sortino_ratio,
+    calc_max_drawdown,
+    calc_max_drawdown_duration,
+    calc_win_rate,
+    calc_rolling_drawdown,
+    calc_cumulative_returns_series,
 )
 
+# ------------------------------------------------------------------
+# Placeholder for unimplemented metrics.
+# Replace _NA with the real calc_* call when the metric is added to metrics.py.
+# ------------------------------------------------------------------
+_NA = "N/A"
+
 
 # ------------------------------------------------------------------
-# Print helpers
+# Section builders
 # ------------------------------------------------------------------
 
+def _build_overview(cfg: dict) -> str:
+    bt = cfg["backtest"]
+    universe = bt.get("universe", "") or "custom"
+    universe_label = "S&P 500" if universe == "sp500" else universe
 
-def _build_backtest_result_md(result: BacktestResult) -> str:
-    return (
-        f"--- Backtest Results ---\n"
-        f"  Final portfolio value:  ${calc_final_value(result.starting_capital, result.returns):<12,.2f}\n"
-        f"  Cumulative return:      {calc_cumulative_return(result.returns):<12.2%}\n"
-        f"  Annualised return:      {calc_annualised_return(result.starting_capital, result.returns):<12.2%}\n"
-        f"  Annualised volatility:  {calc_annualised_volatility(result.returns):<12.2%}\n"
-        f"  Sharpe ratio:           {calc_sharpe_ratio(result.returns):<12.2f}\n"
-    )
-
-
-def _build_permutation_result_md(result: PermutationResult) -> str:
-    null_sharpes = [calc_sharpe_ratio(r.returns) for r in result.null_distribution]
-    return (
-        f"--- Permutation Test Results ---\n"
-        f"  Scheme:                 {result.scheme}\n"
-        f"  N permutations:         {result.N:<8d}\n"
-        f"  Baseline Sharpe:        {calc_sharpe_ratio(result.baseline.returns):<8.2f}\n"
-        f"  Mean null Sharpe:       {np.mean(null_sharpes):<8.2f}\n"
-        f"  Null Sharpe std:        {np.std(null_sharpes):<8.2f}\n"
-        f"  p-value (one-tailed):   {result.p_value:<8.4f}\n"
-    )
+    rows = [
+        ("Strategy",       bt["strategy"].replace("_", " ").title()),
+        ("Universe",       universe_label),
+        ("Period",         f"{bt['start_date']} → {bt['end_date']}"),
+        ("Initial Capital", f"${bt['initial_capital']:>,.2f}"),
+    ]
+    return _md_section("Overview", _md_kv_table(rows))
 
 
-def _build_wf_result_md(result: WalkForwardResult) -> str:
-    return (
-        f"--- Walk-Forward Validation Results ---\n"
-        f"  Scheme:  {result.scheme}\n"
-        f"  Folds:   {len(result.folds):<8d}\n"
-        f"  Metric:  {result.metric:<8s}\n\n"
-        f"  {'Fold':<6} {'IS Start':<12} {'IS End':<12} {'OOS Start':<12} {'OOS End':<12} {'IS Sharpe':<12} {'OOS Sharpe':<12} Selected Params\n"
-        + "\n".join(
-            f"  {fold.fold_idx:<6d} "
-            f"{fold.is_start.date().strftime('%Y-%m-%d'):<12} "
-            f"{fold.is_end.date().strftime('%Y-%m-%d'):<12} "
-            f"{fold.oos_start.date().strftime('%Y-%m-%d'):<12} "
-            f"{fold.oos_end.date().strftime('%Y-%m-%d'):<12} "
-            f"{max(fold.param_results, key=lambda x: x.is_metric).is_metric:<12.2f} "
-            f"{fold.oos_metric:<12.2f} "
-            + ", ".join(f"{k}={v}" for k, v in fold.selected_params.items())
-            for fold in result.folds
+def _build_strategy_params(cfg: dict) -> str:
+    strategy_name = cfg["backtest"]["strategy"]
+    params = cfg.get("strategies", {}).get(strategy_name, {})
+    if not params:
+        return ""
+    rows = [(k.replace("_", " ").title(), str(v)) for k, v in params.items()]
+    return _md_section("Strategy Parameters", _md_kv_table(rows))
+
+
+def _build_execution_params(cfg: dict) -> str:
+    ex = cfg.get("execution", {})
+    if not ex:
+        return ""
+    rows = [
+        ("Commission",  f"{ex.get('commission_bps', _NA)} bps"),
+        ("Spread",      f"{ex.get('spread_bps', _NA)} bps"),
+        ("Slippage k",  str(ex.get('slippage_k', _NA))),
+        ("ADV Window",  str(ex.get('adv_window', _NA))),
+    ]
+    return _md_section("Execution Parameters", _md_kv_table(rows))
+
+
+def _build_performance_summary(result: BacktestResult) -> str:
+    r = result.returns
+    c = result.starting_capital
+
+    rows = [
+        ("Final Portfolio Value",   f"${calc_final_value(c, r):>,.2f}"),
+        ("Cumulative Return",       f"{calc_cumulative_return(r):.2%}"),
+        ("Annualised Return",       f"{calc_annualised_return(c, r):.2%}"),
+        ("Annualised Volatility",   f"{calc_annualised_volatility(r):.2%}"),
+        ("Sharpe Ratio",            f"{calc_sharpe_ratio(r):.4f}"),
+        ("Sortino Ratio",           _NA),  # TODO: add calc_sortino_ratio(r) to metrics.py
+        ("Max Drawdown",            _NA),  # TODO: add calc_max_drawdown(r) to metrics.py
+        ("Max Drawdown Duration",   _NA),  # TODO: add calc_max_drawdown_duration(r) to metrics.py
+        ("Calmar Ratio",            _NA),  # TODO: annualised_return / abs(max_drawdown)
+        ("Win Rate",                _NA),  # TODO: add calc_win_rate(r) to metrics.py
+    ]
+    return _md_section("Performance Summary", _md_kv_table(rows))
+
+
+def _build_costs_summary(result: BacktestResult) -> str:
+    total_cost   = result.costs.sum()
+    avg_daily    = result.costs.mean()
+    avg_turnover = result.turnover.mean()
+
+    rows = [
+        ("Total Transaction Costs", f"${total_cost:>,.2f}"),
+        ("Avg Daily Costs",         f"${avg_daily:>,.4f}"),
+        ("Avg Daily Turnover",      f"{avg_turnover:.4%}"),
+    ]
+    return _md_section("Transaction Costs", _md_kv_table(rows))
+
+
+def _build_permutation_summary(result: PermutationResult) -> str:
+    null_sharpes = np.array([
+        calc_sharpe_ratio(r.returns) for r in result.null_distribution
+    ])
+    baseline_sharpe = calc_sharpe_ratio(result.baseline.returns)
+
+    if result.p_value < 0.05:
+        interpretation = "Statistically significant at the 5% level."
+    elif result.p_value < 0.10:
+        interpretation = "Marginal significance at the 10% level."
+    else:
+        interpretation = (
+            "Not statistically significant. "
+            "Cannot reject the null hypothesis of no predictive power."
         )
-        + "\n\n"
-        f"  Mean OOS {result.metric}: {np.mean([f.oos_metric for f in result.folds]):.2f}\n"
-        f"  Std OOS {result.metric}:  {np.std([f.oos_metric for f in result.folds]):.2f}\n"
-        f"  Folds with positive OOS metric: {sum(1 for m in [f.oos_metric for f in result.folds] if m > 0)} / {len(result.folds)}\n"
-    )
 
+    rows = [
+        ("Scheme",              result.scheme),
+        ("N Permutations",      str(result.N)),
+        ("Baseline Sharpe",     f"{baseline_sharpe:.4f}"),
+        ("Mean Null Sharpe",    f"{null_sharpes.mean():.4f}"),
+        ("Null Sharpe Std",     f"{null_sharpes.std():.4f}"),
+        ("p-value (one-tailed)", f"{result.p_value:.4f}"),
+        ("Interpretation",      interpretation),
+    ]
+    return _md_section("Permutation Test", _md_kv_table(rows))
+
+
+def _build_walk_forward_summary(result: WalkForwardResult) -> str:
+    oos_metrics = [f.oos_metric for f in result.folds]
+    positive    = sum(1 for m in oos_metrics if m > 0)
+
+    summary_rows = [
+        ("Scheme",                      result.scheme),
+        ("Metric",                      result.metric),
+        ("Folds",                       str(len(result.folds))),
+        ("Mean OOS Sharpe",             f"{np.mean(oos_metrics):.4f}"),
+        ("Std OOS Sharpe",              f"{np.std(oos_metrics):.4f}"),
+        ("Folds with Positive OOS",     f"{positive} / {len(result.folds)}"),
+    ]
+    summary = _md_kv_table(summary_rows)
+
+    # Per-fold detail table
+    headers = ["Fold", "IS Start", "IS End", "OOS Start", "OOS End",
+               "Best IS Sharpe", "OOS Sharpe", "Selected Params"]
+    fold_rows = []
+    for fold in result.folds:
+        best_is     = max(fold.param_results, key=lambda x: x.is_metric).is_metric
+        params_str  = ", ".join(f"{k}={v}" for k, v in fold.selected_params.items())
+        fold_rows.append([
+            str(fold.fold_idx),
+            fold.is_start.strftime("%Y-%m-%d"),
+            fold.is_end.strftime("%Y-%m-%d"),
+            fold.oos_start.strftime("%Y-%m-%d"),
+            fold.oos_end.strftime("%Y-%m-%d"),
+            f"{best_is:.4f}",
+            f"{fold.oos_metric:.4f}",
+            params_str,
+        ])
+    fold_table = _md_table(headers, fold_rows)
+
+    return _md_section("Walk-Forward Validation", summary + "\n" + fold_table)
+
+
+# ------------------------------------------------------------------
+# Markdown helpers
+# ------------------------------------------------------------------
+
+def _md_section(title: str, body: str) -> str:
+    return f"## {title}\n\n{body}\n"
+
+
+def _md_kv_table(rows: list[tuple[str, str]]) -> str:
+    """Two-column key/value markdown table."""
+    lines = ["| | |", "|---|---|"]
+    lines += [f"| {k} | {v} |" for k, v in rows]
+    return "\n".join(lines) + "\n"
+
+
+def _md_table(headers: list[str], rows: list[list[str]]) -> str:
+    """General markdown table."""
+    header_row    = "| " + " | ".join(headers) + " |"
+    separator_row = "| " + " | ".join("---" for _ in headers) + " |"
+    data_rows     = ["| " + " | ".join(row) + " |" for row in rows]
+    return "\n".join([header_row, separator_row] + data_rows) + "\n"
+
+
+# ------------------------------------------------------------------
+# Public interface
+# ------------------------------------------------------------------
 
 def generate_tear_sheet(
-    backtest_results: BacktestResult,
+    backtest_result: BacktestResult,
     permutation_result: PermutationResult,
     wf_result: WalkForwardResult,
+    cfg: dict,
+    output_path: str = "tearsheet.md",
 ) -> None:
     """
-    Generates a structured summary report (tear sheet) for the backtest,
-    permutation test, and walk-forward validation.
+    Write a markdown tear sheet summarising backtest, permutation test,
+    and walk-forward validation results.
 
     Parameters
     ----------
-    backtest_results : BacktestResult
-        The result of the backtest on the original data.
+    backtest_result : BacktestResult
     permutation_result : PermutationResult
-        The result of the permutation test.
     wf_result : WalkForwardResult
-        The result of the walk-forward validation.
+    cfg : dict
+        Full config dict (used for header metadata).
+    output_path : str
+        Destination path for the markdown file. Defaults to tearsheet.md
+        in the current working directory.
     """
-    backtest_md = _build_backtest_result_md(backtest_results)
-    permutation_md = _build_permutation_result_md(permutation_result)
-    wf_md = _build_wf_result_md(wf_result)
+    sections = [
+        "# Strategy Tear Sheet\n",
+        _build_overview(cfg),
+        _build_strategy_params(cfg),
+        _build_execution_params(cfg),
+        _build_performance_summary(backtest_result),
+        _build_costs_summary(backtest_result),
+        _build_permutation_summary(permutation_result),
+        _build_walk_forward_summary(wf_result),
+    ]
+    content = "\n".join(s for s in sections if s)
 
-    markdown_content = f"""# Tear Sheet
-
-{backtest_md}
-
-{permutation_md}
-
-{wf_md}
-    """
-    with open("tearsheet.md", "w") as f:
-        f.write(markdown_content)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write(content)
+    print(f"Tear sheet written to {output_path}")
