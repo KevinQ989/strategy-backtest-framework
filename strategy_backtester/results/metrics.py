@@ -4,7 +4,7 @@ import pandas as pd
 def calc_cumulative_return(returns: pd.Series) -> float:
     if returns.empty:
         return 0.0
-    return (1+returns).prod() - 1
+    return (1 + returns).prod() - 1
 
 
 def calc_final_value(initial_value: float, returns: pd.Series) -> float:
@@ -24,17 +24,20 @@ def calc_annualised_return(initial_value: float, returns: pd.Series) -> float:
 
 
 def calc_annualised_volatility(returns: pd.Series) -> float:
-    sd = returns.std()
-    return sd * np.sqrt(252)
+    return returns.std() * np.sqrt(252)
 
 
-#Risk free rate of 4%
+# Risk free rate of 4%
 def calc_sharpe_ratio(returns: pd.Series) -> float:
-    if returns.empty or returns.std() == 0:
+    if returns.empty:
         return 0.0
+    if returns.std() == 0:
+        raise ValueError(
+            "Standard deviation of returns is zero. Sharpe ratio is undefined."
+        )
     daily_rf = 0.04 / 252
     excess_returns = returns - daily_rf
-    return (excess_returns.mean() / returns.std() )* np.sqrt(252)
+    return (excess_returns.mean() / returns.std() ) * np.sqrt(252)
 
 
 def calc_sortino_ratio(returns: pd.Series) -> float:
@@ -72,7 +75,6 @@ def calc_max_drawdown_duration(returns: pd.Series) -> int:
     peak = cumulative_returns.cummax()
     drawdown = (cumulative_returns - peak) / peak
 
-    # Calculate the duration of drawdowns
     drawdown_duration = 0
     max_duration = 0
     for d in drawdown:
@@ -98,8 +100,7 @@ def calc_rolling_drawdown(returns: pd.Series) -> pd.Series:
         return pd.Series(dtype=float)
     cumulative_returns = (1 + returns).cumprod()
     peak = cumulative_returns.cummax()
-    drawdown = (cumulative_returns - peak) / peak
-    return drawdown
+    return (cumulative_returns - peak) / peak
 
 
 def calc_cumulative_returns_series(returns: pd.Series) -> pd.Series:

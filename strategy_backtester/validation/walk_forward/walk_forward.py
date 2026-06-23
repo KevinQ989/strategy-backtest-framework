@@ -106,7 +106,10 @@ def _compute_metric(result: BacktestResult, metric: str) -> float:
         If metric is not in _SUPPORTED_METRICS.
     """
     if metric == "sharpe":
-        return calc_sharpe_ratio(result.returns)
+        try:
+            return calc_sharpe_ratio(result.returns)
+        except ValueError:
+            return float("-inf")
     raise ValueError(
         f"Unsupported metric: {metric!r}. Supported: {_SUPPORTED_METRICS}"
     )
