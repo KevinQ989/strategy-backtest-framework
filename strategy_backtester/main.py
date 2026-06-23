@@ -336,7 +336,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------
     # Generate outputs
     # ------------------------------------------------------------------
-    print("\nGenerating dashboard...")
-    generate_dashboard(perm_result, cfg["dashboard"]["rolling_sharpe_window"])
+    # print("\nGenerating dashboard...")
+    # generate_dashboard(perm_result, cfg["dashboard"]["rolling_sharpe_window"])
     print("Generating tear sheet...")
-    generate_tear_sheet(result, perm_result, wfv_result, cfg)
+    generate_tear_sheet(result, perm_result, wfv_result)
