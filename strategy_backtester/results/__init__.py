@@ -12,7 +12,6 @@ from .metrics import (
     calc_rolling_drawdown,
     calc_cumulative_returns_series,
 )
-from .plots import generate_dashboard
 from .tearsheet import generate_tear_sheet
 
 __all__ = [
@@ -28,6 +27,5 @@ __all__ = [
     "calc_win_rate",
     "calc_rolling_drawdown",
     "calc_cumulative_returns_series",
-    "generate_dashboard",
     "generate_tear_sheet",
 ]

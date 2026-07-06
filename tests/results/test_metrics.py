@@ -43,4 +43,5 @@ def test_calc_sharpe_ratio(sample_returns):
     expected_sharpe = (excess_returns.mean() / sample_returns.std()) * (252 ** 0.5)
     assert abs(metrics.calc_sharpe_ratio(sample_returns) - expected_sharpe) < 1e-4
     assert metrics.calc_sharpe_ratio(pd.Series([])) == 0.0
-    assert metrics.calc_sharpe_ratio(pd.Series([0.01] * 252)) == 0.0
+    with pytest.raises(ValueError, match="Standard deviation of returns is zero"):
+        metrics.calc_sharpe_ratio(pd.Series([0.01] * 252))

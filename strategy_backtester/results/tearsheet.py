@@ -1,15 +1,11 @@
 from __future__ import annotations
 import io
 import base64
-import calendar
 import os
 from datetime import date as _date
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use("Agg")  # Non-interactive backend — must be set before importing pyplot
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 from strategy_backtester.core import (
     BacktestResult,
     PermutationResult,
@@ -27,22 +23,21 @@ from .metrics import (
     calc_max_drawdown_duration,
     calc_win_rate,
 )
-
-# ------------------------------------------------------------------
-# Design tokens
-# ------------------------------------------------------------------
-_C_BG        = "#F7F8FC"
-_C_SURFACE   = "#FFFFFF"
-_C_BORDER    = "#DDE3EE"
-_C_TEXT      = "#1C2333"
-_C_MUTED     = "#64748B"
-_C_ACCENT    = "#1B3A6B"   # deep navy — header bar, section titles
-_C_POSITIVE  = "#1A6B45"   # forest green
-_C_NEGATIVE  = "#B91C1C"   # deep red
-_C_CHART_1   = "#1B3A6B"   # primary chart series
-_C_CHART_2   = "#94A3B8"   # secondary / null distribution
-_FONT_STACK  = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif"
-_MONO_STACK  = "'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace"
+from .plots import (
+    # Design tokens — defined once in plots.py, shared here
+    _C_BG, _C_SURFACE, _C_BORDER, _C_TEXT, _C_MUTED, _C_ACCENT,
+    _C_POSITIVE, _C_NEGATIVE, _C_CHART_1, _C_CHART_2,
+    _FONT_STACK, _MONO_STACK,
+    # Chart functions
+    chart_permutation_envelope,
+    chart_underwater_drawdown,
+    chart_rolling_sharpe,
+    chart_returns_histogram_kde,
+    chart_monthly_returns,
+    chart_return_distribution,
+    chart_permutation_null_sharpes,
+    chart_wf_oos_sharpes,
+)
 
 
 # ------------------------------------------------------------------
@@ -71,15 +66,14 @@ def _safe_sharpe(returns: pd.Series) -> float:
 # ------------------------------------------------------------------
 
 def _fmt_ratio(val: float, fmt: str = ".4f") -> str:
-    if np.isinf(val):  return "∞"
-    if np.isnan(val):  return "N/A"
+    if np.isinf(val): return "∞"
+    if np.isnan(val): return "N/A"
     return format(val, fmt)
 
 
-def _card(title: str, body: str, full_width: bool = True) -> str:
-    w = "100%" if full_width else "auto"
+def _card(title: str, body: str) -> str:
     return f"""
-    <div class="card" style="width:{w}">
+    <div class="card">
       <h2 class="card-title">{title}</h2>
       {body}
     </div>"""
@@ -109,11 +103,7 @@ def _data_table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 def _metric_grid(metrics: list[tuple[str, str, str | None]]) -> str:
-    """
-    Render a grid of metric tiles.
-    metrics: list of (label, value, colour_class | None)
-    colour_class: 'pos', 'neg', or None for neutral
-    """
+    """metrics: list of (label, value, colour_class) where colour_class is 'pos', 'neg', or None."""
     tiles = []
     for label, value, colour in metrics:
         cls = f" val-{colour}" if colour else ""
@@ -127,182 +117,12 @@ def _metric_grid(metrics: list[tuple[str, str, str | None]]) -> str:
 
 
 # ------------------------------------------------------------------
-# Charts
-# ------------------------------------------------------------------
-
-def _chart_monthly_returns(returns: pd.Series) -> str:
-    """Heatmap of monthly returns."""
-    monthly = (1 + returns).resample("ME").prod() - 1
-    monthly.index = monthly.index.to_period("M")
-
-    years  = sorted(monthly.index.year.unique())
-    months = list(range(1, 13))
-    data   = np.full((len(years), 12), np.nan)
-    for period, val in monthly.items():
-        r = years.index(period.year)
-        c = period.month - 1
-        data[r, c] = val
-
-    fig, ax = plt.subplots(figsize=(12, max(3, len(years) * 0.55)),
-                           facecolor=_C_SURFACE)
-    ax.set_facecolor(_C_SURFACE)
-
-    vmax = np.nanmax(np.abs(data)) if not np.all(np.isnan(data)) else 0.05
-    cmap = mcolors.LinearSegmentedColormap.from_list(
-        "rg", [_C_NEGATIVE, _C_SURFACE, _C_POSITIVE]
-    )
-    norm = mcolors.TwoSlopeNorm(vmin=-vmax, vcenter=0, vmax=vmax)
-    im   = ax.imshow(data, cmap=cmap, norm=norm, aspect="auto")
-
-    ax.set_xticks(range(12))
-    ax.set_xticklabels([calendar.month_abbr[m] for m in months],
-                       fontsize=8, color=_C_MUTED)
-    ax.set_yticks(range(len(years)))
-    ax.set_yticklabels(years, fontsize=8, color=_C_MUTED)
-
-    for r in range(len(years)):
-        for c in range(12):
-            v = data[r, c]
-            if not np.isnan(v):
-                colour = _C_SURFACE if abs(v) > vmax * 0.5 else _C_TEXT
-                ax.text(c, r, f"{v:.1%}", ha="center", va="center",
-                        fontsize=6.5, color=colour,
-                        fontfamily=_MONO_STACK)
-
-    ax.set_title("Monthly Returns", fontsize=10, color=_C_TEXT,
-                 fontweight="600", pad=10)
-    cbar = fig.colorbar(im, ax=ax, fraction=0.015, pad=0.02)
-    cbar.ax.tick_params(labelsize=7, colors=_C_MUTED)
-    cbar.ax.yaxis.set_major_formatter(
-        plt.FuncFormatter(lambda x, _: f"{x:.0%}")
-    )
-
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-    ax.tick_params(length=0)
-    fig.tight_layout()
-    return _fig_to_img_tag(fig)
-
-
-def _chart_return_distribution(returns: pd.Series) -> str:
-    """Histogram of daily returns."""
-    fig, ax = plt.subplots(figsize=(5.5, 3.5), facecolor=_C_SURFACE)
-    ax.set_facecolor(_C_SURFACE)
-
-    ax.hist(returns, bins=80, color=_C_CHART_1, alpha=0.75,
-            edgecolor="none", density=True, label="Daily returns")
-
-    mu, sigma = returns.mean(), returns.std()
-    x = np.linspace(returns.min(), returns.max(), 300)
-    normal = (1 / (sigma * np.sqrt(2 * np.pi))) * np.exp(-0.5 * ((x - mu) / sigma) ** 2)
-    ax.plot(x, normal, color=_C_NEGATIVE, linewidth=1.5,
-            linestyle="--", label="Normal fit", zorder=3)
-
-    ax.axvline(mu, color=_C_ACCENT, linewidth=1.2, linestyle="-", alpha=0.8)
-    ax.set_title("Return Distribution", fontsize=10, color=_C_TEXT,
-                 fontweight="600", pad=8)
-    ax.set_xlabel("Daily return", fontsize=8, color=_C_MUTED)
-    ax.set_ylabel("Density", fontsize=8, color=_C_MUTED)
-    ax.tick_params(labelsize=7, colors=_C_MUTED)
-    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.1%}"))
-    ax.legend(fontsize=7, framealpha=0)
-
-    for spine in ["top", "right"]:
-        ax.spines[spine].set_visible(False)
-    for spine in ["left", "bottom"]:
-        ax.spines[spine].set_color(_C_BORDER)
-
-    skew = returns.skew()
-    kurt = returns.kurtosis()
-    ax.text(0.97, 0.95,
-            f"Skew: {skew:.2f}\nKurt: {kurt:.2f}",
-            transform=ax.transAxes, ha="right", va="top",
-            fontsize=7, color=_C_MUTED, fontfamily=_MONO_STACK)
-    fig.tight_layout()
-    return _fig_to_img_tag(fig)
-
-
-def _chart_permutation_sharpes(
-    baseline_metric: float,
-    null_metrics: np.ndarray,
-    p_value: float,
-) -> str:
-    """Histogram of permutation test metric values."""
-    clean = null_metrics[~np.isnan(null_metrics)]
-
-    fig, ax = plt.subplots(figsize=(5.5, 3.5), facecolor=_C_SURFACE)
-    ax.set_facecolor(_C_SURFACE)
-
-    ax.hist(clean, bins=50, color=_C_CHART_2, alpha=0.80,
-            edgecolor="none", density=True, label="Null distribution")
-    ax.axvline(baseline_metric, color=_C_ACCENT, linewidth=2,
-               label=f"Baseline ({baseline_metric:.3f})", zorder=3)
-
-    ax.set_title("Permutation Test — Null Metric Distribution",
-                 fontsize=10, color=_C_TEXT, fontweight="600", pad=8)
-    ax.set_xlabel("Metric", fontsize=8, color=_C_MUTED)
-    ax.set_ylabel("Density", fontsize=8, color=_C_MUTED)
-    ax.tick_params(labelsize=7, colors=_C_MUTED)
-    ax.legend(fontsize=7, framealpha=0)
-
-    ax.text(0.97, 0.95, f"p = {p_value:.4f}",
-            transform=ax.transAxes, ha="right", va="top",
-            fontsize=8, color=_C_MUTED, fontfamily=_MONO_STACK)
-
-    for spine in ["top", "right"]:
-        ax.spines[spine].set_visible(False)
-    for spine in ["left", "bottom"]:
-        ax.spines[spine].set_color(_C_BORDER)
-
-    fig.tight_layout()
-    return _fig_to_img_tag(fig)
-
-
-def _chart_wf_oos_sharpes(result: WalkForwardResult) -> str:
-    """Bar chart of OOS metric by fold."""
-    folds   = [f.fold_idx for f in result.folds]
-    metrics = [f.oos_metric for f in result.folds]
-    colours = [_C_POSITIVE if m > 0 else _C_NEGATIVE for m in metrics]
-
-    fig, ax = plt.subplots(figsize=(max(5, len(folds) * 1.2), 3.2),
-                           facecolor=_C_SURFACE)
-    ax.set_facecolor(_C_SURFACE)
-
-    bars = ax.bar(folds, metrics, color=colours, alpha=0.85, width=0.6)
-    ax.axhline(0, color=_C_BORDER, linewidth=1)
-    ax.axhline(np.mean(metrics), color=_C_ACCENT, linewidth=1.2,
-               linestyle="--", alpha=0.7, label=f"Mean ({np.mean(metrics):.3f})")
-
-    for bar, val in zip(bars, metrics):
-        ax.text(bar.get_x() + bar.get_width() / 2,
-                val + (0.02 if val >= 0 else -0.06),
-                f"{val:.3f}", ha="center", va="bottom" if val >= 0 else "top",
-                fontsize=7.5, color=_C_TEXT, fontfamily=_MONO_STACK)
-
-    ax.set_xticks(folds)
-    ax.set_xticklabels([f"Fold {f}" for f in folds], fontsize=8, color=_C_MUTED)
-    ax.set_ylabel("OOS Sharpe", fontsize=8, color=_C_MUTED)
-    ax.set_title("Walk-Forward OOS Sharpe by Fold", fontsize=10,
-                 color=_C_TEXT, fontweight="600", pad=8)
-    ax.tick_params(labelsize=7, colors=_C_MUTED)
-    ax.legend(fontsize=7, framealpha=0)
-
-    for spine in ["top", "right"]:
-        ax.spines[spine].set_visible(False)
-    for spine in ["left", "bottom"]:
-        ax.spines[spine].set_color(_C_BORDER)
-
-    fig.tight_layout()
-    return _fig_to_img_tag(fig)
-
-
-# ------------------------------------------------------------------
 # Section builders
 # ------------------------------------------------------------------
 
 def _build_overview(cfg: dict) -> str:
-    bt  = cfg["backtest"]
-    ex  = cfg.get("execution", {})
+    bt       = cfg["backtest"]
+    ex       = cfg.get("execution", {})
     universe = bt.get("universe", "") or "custom"
     rows = [
         ("Strategy",        bt["strategy"].replace("_", " ").title()),
@@ -330,7 +150,7 @@ def _build_strategy_params(cfg: dict) -> str:
 
 
 def _build_performance_summary(result: BacktestResult) -> str:
-    r, c = result.returns, result.starting_capital
+    r, c   = result.returns, result.starting_capital
     max_dd = calc_max_drawdown(r)
 
     def _sign(val: float) -> str | None:
@@ -342,28 +162,41 @@ def _build_performance_summary(result: BacktestResult) -> str:
     calmar  = calc_calmar_ratio(c, r)
     ann_ret = calc_annualised_return(c, r)
 
-    metrics = [
-        ("Final Portfolio Value",  f"${calc_final_value(c, r):>,.2f}",          _sign(calc_cumulative_return(r))),
-        ("Cumulative Return",      f"{calc_cumulative_return(r):.2%}",           _sign(calc_cumulative_return(r))),
-        ("Annualised Return",      f"{ann_ret:.2%}",                             _sign(ann_ret)),
-        ("Annualised Volatility",  f"{calc_annualised_volatility(r):.2%}",       None),
-        ("Sharpe Ratio",           _fmt_ratio(sharpe),                           _sign(sharpe)),
-        ("Sortino Ratio",          _fmt_ratio(sortino),                          _sign(sortino)),
-        ("Calmar Ratio",           _fmt_ratio(calmar, ".2f"),                    _sign(calmar)),
-        ("Max Drawdown",           f"{abs(max_dd):.2%}",                         "neg" if max_dd < 0 else None),
-        ("Max Drawdown Duration",  f"{calc_max_drawdown_duration(r)} trading days", None),
-        ("Win Rate",               f"{calc_win_rate(r):.2%}",                   None),
-        ("Return Skew",            _fmt_ratio(r.skew()),                         _sign(r.skew())),
-        ("Excess Kurtosis",        _fmt_ratio(r.kurtosis()),                     None),
+    tiles = [
+        ("Final Portfolio Value", f"${calc_final_value(c, r):>,.2f}",        _sign(calc_cumulative_return(r))),
+        ("Cumulative Return",     f"{calc_cumulative_return(r):.2%}",         _sign(calc_cumulative_return(r))),
+        ("Annualised Return",     f"{ann_ret:.2%}",                           _sign(ann_ret)),
+        ("Annualised Volatility", f"{calc_annualised_volatility(r):.2%}",     None),
+        ("Sharpe Ratio",          _fmt_ratio(sharpe),                         _sign(sharpe)),
+        ("Sortino Ratio",         _fmt_ratio(sortino),                        _sign(sortino)),
+        ("Calmar Ratio",          _fmt_ratio(calmar, ".2f"),                  _sign(calmar)),
+        ("Max Drawdown",          f"{abs(max_dd):.2%}",                       "neg" if max_dd < 0 else None),
+        ("Max DD Duration",       f"{calc_max_drawdown_duration(r)} days",    None),
+        ("Win Rate",              f"{calc_win_rate(r):.2%}",                  None),
+        ("Return Skew",           _fmt_ratio(r.skew()),                       _sign(r.skew())),
+        ("Excess Kurtosis",       _fmt_ratio(r.kurtosis()),                   None),
     ]
-    grid    = _metric_grid(metrics)
-    dist_chart = _chart_return_distribution(r)
+    chart_normal = _fig_to_img_tag(chart_return_distribution(r))
+    chart_kde    = _fig_to_img_tag(chart_returns_histogram_kde(result))
+
     body = f"""
-    <div class="perf-layout">
-      <div class="perf-metrics">{grid}</div>
-      <div class="perf-chart">{dist_chart}</div>
+    {_metric_grid(tiles)}
+    <div class="side-layout" style="margin-top:1.5rem">
+      <div>{chart_normal}</div>
+      <div>{chart_kde}</div>
     </div>"""
     return _card("Performance Summary", body)
+
+
+def _build_return_analysis(result: BacktestResult, window: int) -> str:
+    chart_dd     = _fig_to_img_tag(chart_underwater_drawdown(result))
+    chart_sharpe = _fig_to_img_tag(chart_rolling_sharpe(result, window))
+    body = f"""
+    <div class="side-layout">
+      <div>{chart_dd}</div>
+      <div>{chart_sharpe}</div>
+    </div>"""
+    return _card("Return Analysis", body)
 
 
 def _build_costs_summary(result: BacktestResult) -> str:
@@ -381,13 +214,13 @@ def _build_permutation_section(result: PermutationResult) -> str:
     clean           = null_sharpes[~np.isnan(null_sharpes)]
 
     if result.p_value < 0.05:
-        interp = "Statistically significant at the 5% level."
+        interp     = "Statistically significant at the 5% level."
         interp_cls = "pos"
     elif result.p_value < 0.10:
-        interp = "Marginal significance at the 10% level."
+        interp     = "Marginal significance at the 10% level."
         interp_cls = "neg"
     else:
-        interp = "Not statistically significant — cannot reject the null hypothesis of no predictive power."
+        interp     = "Not statistically significant — cannot reject the null hypothesis of no predictive power."
         interp_cls = "neg"
 
     rows = [
@@ -399,11 +232,13 @@ def _build_permutation_section(result: PermutationResult) -> str:
         ("p-value (one-tailed)", f"{result.p_value:.4f}"),
         ("Interpretation",       f'<span class="val-{interp_cls}">{interp}</span>'),
     ]
-    chart = _chart_permutation_sharpes(baseline_sharpe, null_sharpes, result.p_value)
-    body  = f"""
-    <div class="side-layout">
+    envelope = _fig_to_img_tag(chart_permutation_envelope(result))
+    hist     = _fig_to_img_tag(chart_permutation_null_sharpes(baseline_sharpe, null_sharpes, result.p_value))
+    body = f"""
+    {envelope}
+    <div class="side-layout" style="margin-top:1.5rem">
       <div>{_kv_table(rows)}</div>
-      <div>{chart}</div>
+      <div>{hist}</div>
     </div>"""
     return _card("Permutation Test", body)
 
@@ -412,6 +247,7 @@ def _build_walk_forward_section(result: WalkForwardResult) -> str:
     oos    = [f.oos_metric for f in result.folds]
     metric = result.metric.capitalize()
     n_pos  = sum(1 for m in oos if m > 0)
+
     summary_rows = [
         ("Scheme",                  result.scheme),
         ("Metric",                  metric),
@@ -420,8 +256,10 @@ def _build_walk_forward_section(result: WalkForwardResult) -> str:
         (f"Std OOS {metric}",       _fmt_ratio(np.std(oos))),
         ("Folds with Positive OOS", f"{n_pos} / {len(result.folds)}"),
     ]
-    headers = ["Fold", "IS Start", "IS End", "OOS Start", "OOS End",
-               f"Best IS {metric}", f"OOS {metric}", "Selected Params"]
+    headers = [
+        "Fold", "IS Start", "IS End", "OOS Start", "OOS End",
+        f"Best IS {metric}", f"OOS {metric}", "Selected Params",
+    ]
     fold_rows = []
     for fold in result.folds:
         best_is    = max(fold.param_results, key=lambda x: x.is_metric).is_metric
@@ -438,7 +276,8 @@ def _build_walk_forward_section(result: WalkForwardResult) -> str:
             f'<span style="color:{colour};font-weight:600">{_fmt_ratio(oos_val)}</span>',
             f'<code>{params_str}</code>',
         ])
-    bar_chart = _chart_wf_oos_sharpes(result)
+
+    bar_chart = _fig_to_img_tag(chart_wf_oos_sharpes(result))
     body = f"""
     {bar_chart}
     <div class="side-layout" style="margin-top:1.5rem">
@@ -454,14 +293,14 @@ def _build_walk_forward_section(result: WalkForwardResult) -> str:
 
 _CSS = f"""
   :root {{
-    --bg:       {_C_BG};
-    --surface:  {_C_SURFACE};
-    --border:   {_C_BORDER};
-    --text:     {_C_TEXT};
-    --muted:    {_C_MUTED};
-    --accent:   {_C_ACCENT};
-    --pos:      {_C_POSITIVE};
-    --neg:      {_C_NEGATIVE};
+    --bg:      {_C_BG};
+    --surface: {_C_SURFACE};
+    --border:  {_C_BORDER};
+    --text:    {_C_TEXT};
+    --muted:   {_C_MUTED};
+    --accent:  {_C_ACCENT};
+    --pos:     {_C_POSITIVE};
+    --neg:     {_C_NEGATIVE};
   }}
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{
@@ -476,7 +315,6 @@ _CSS = f"""
     margin: 0 auto;
     padding: 2rem 1.5rem 4rem;
   }}
-  /* Header */
   .ts-header {{
     background: var(--accent);
     color: #fff;
@@ -495,7 +333,6 @@ _CSS = f"""
     margin-top: 0.25rem;
     font-family: {_MONO_STACK};
   }}
-  /* Cards */
   .card {{
     background: var(--surface);
     border: 1px solid var(--border);
@@ -514,14 +351,8 @@ _CSS = f"""
     border-bottom: 2px solid var(--accent);
     margin-bottom: 1.1rem;
   }}
-  /* KV table */
-  .kv-table {{
-    width: 100%;
-    border-collapse: collapse;
-  }}
-  .kv-table tr:not(:last-child) td {{
-    border-bottom: 1px solid var(--border);
-  }}
+  .kv-table {{ width: 100%; border-collapse: collapse; }}
+  .kv-table tr:not(:last-child) td {{ border-bottom: 1px solid var(--border); }}
   .kv-key {{
     padding: 0.45rem 0.75rem 0.45rem 0;
     color: var(--muted);
@@ -535,7 +366,6 @@ _CSS = f"""
     font-family: {_MONO_STACK};
     font-weight: 500;
   }}
-  /* Metric tiles */
   .metric-grid {{
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -562,13 +392,8 @@ _CSS = f"""
   }}
   .val-pos {{ color: var(--pos); }}
   .val-neg {{ color: var(--neg); }}
-  /* Data table */
   .table-scroll {{ overflow-x: auto; }}
-  .data-table {{
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-  }}
+  .data-table {{ width: 100%; border-collapse: collapse; font-size: 0.8rem; }}
   .data-table th {{
     background: var(--bg);
     color: var(--muted);
@@ -589,18 +414,7 @@ _CSS = f"""
   }}
   .data-table tr:last-child td {{ border-bottom: none; }}
   .data-table tr:hover td {{ background: var(--bg); }}
-  code {{
-    font-family: {_MONO_STACK};
-    font-size: 0.78rem;
-    color: var(--muted);
-  }}
-  /* Layouts */
-  .perf-layout {{
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    align-items: start;
-  }}
+  code {{ font-family: {_MONO_STACK}; font-size: 0.78rem; color: var(--muted); }}
   .side-layout {{
     display: flex;
     gap: 1.5rem;
@@ -608,13 +422,11 @@ _CSS = f"""
     flex-wrap: wrap;
   }}
   .side-layout > div {{ flex: 1; min-width: 260px; }}
-  /* Monthly heatmap is always full width */
-  .heatmap-card {{ width: 100%; }}
   @media (max-width: 780px) {{
-    .perf-layout {{ grid-template-columns: 1fr; }}
     .side-layout {{ flex-direction: column; }}
   }}
 """
+
 
 # ------------------------------------------------------------------
 # Public interface
@@ -628,8 +440,7 @@ def generate_tear_sheet(
     output_path: str = "tearsheet.html",
 ) -> None:
     """
-    Write a self-contained HTML tear sheet summarising backtest,
-    permutation test, and walk-forward validation results.
+    Write a self-contained HTML tear sheet.
 
     Parameters
     ----------
@@ -641,16 +452,16 @@ def generate_tear_sheet(
     output_path : str
         Destination path. Defaults to tearsheet.html in the CWD.
     """
-    generated = _date.today().isoformat()
-    strategy  = cfg["backtest"]["strategy"].replace("_", " ").title()
-
-    monthly_heatmap = _chart_monthly_returns(backtest_result.returns)
+    generated    = _date.today().isoformat()
+    strategy     = cfg["backtest"]["strategy"].replace("_", " ").title()
+    rolling_win  = cfg.get("dashboard", {}).get("rolling_sharpe_window", 126)
 
     sections = [
         _build_overview(cfg),
         _build_strategy_params(cfg),
         _build_performance_summary(backtest_result),
-        _card("Monthly Returns", monthly_heatmap),
+        _build_return_analysis(backtest_result, rolling_win),
+        _card("Monthly Returns", _fig_to_img_tag(chart_monthly_returns(backtest_result.returns))),
         _build_costs_summary(backtest_result),
         _build_permutation_section(permutation_result),
         _build_walk_forward_section(wf_result),
