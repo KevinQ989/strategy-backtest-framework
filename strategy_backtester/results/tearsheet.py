@@ -131,6 +131,7 @@ def _metric_grid(metrics: list[tuple[str, str, str | None]]) -> str:
 # ------------------------------------------------------------------
 
 def _chart_monthly_returns(returns: pd.Series) -> str:
+    """Heatmap of monthly returns."""
     monthly = (1 + returns).resample("ME").prod() - 1
     monthly.index = monthly.index.to_period("M")
 
@@ -184,6 +185,7 @@ def _chart_monthly_returns(returns: pd.Series) -> str:
 
 
 def _chart_return_distribution(returns: pd.Series) -> str:
+    """Histogram of daily returns."""
     fig, ax = plt.subplots(figsize=(5.5, 3.5), facecolor=_C_SURFACE)
     ax.set_facecolor(_C_SURFACE)
 
@@ -221,23 +223,24 @@ def _chart_return_distribution(returns: pd.Series) -> str:
 
 
 def _chart_permutation_sharpes(
-    baseline_sharpe: float,
-    null_sharpes: np.ndarray,
+    baseline_metric: float,
+    null_metrics: np.ndarray,
     p_value: float,
 ) -> str:
-    clean = null_sharpes[~np.isnan(null_sharpes)]
+    """Histogram of permutation test metric values."""
+    clean = null_metrics[~np.isnan(null_metrics)]
 
     fig, ax = plt.subplots(figsize=(5.5, 3.5), facecolor=_C_SURFACE)
     ax.set_facecolor(_C_SURFACE)
 
     ax.hist(clean, bins=50, color=_C_CHART_2, alpha=0.80,
             edgecolor="none", density=True, label="Null distribution")
-    ax.axvline(baseline_sharpe, color=_C_ACCENT, linewidth=2,
-               label=f"Baseline ({baseline_sharpe:.3f})", zorder=3)
+    ax.axvline(baseline_metric, color=_C_ACCENT, linewidth=2,
+               label=f"Baseline ({baseline_metric:.3f})", zorder=3)
 
-    ax.set_title("Permutation Test — Null Sharpe Distribution",
+    ax.set_title("Permutation Test — Null Metric Distribution",
                  fontsize=10, color=_C_TEXT, fontweight="600", pad=8)
-    ax.set_xlabel("Sharpe ratio", fontsize=8, color=_C_MUTED)
+    ax.set_xlabel("Metric", fontsize=8, color=_C_MUTED)
     ax.set_ylabel("Density", fontsize=8, color=_C_MUTED)
     ax.tick_params(labelsize=7, colors=_C_MUTED)
     ax.legend(fontsize=7, framealpha=0)
@@ -256,6 +259,7 @@ def _chart_permutation_sharpes(
 
 
 def _chart_wf_oos_sharpes(result: WalkForwardResult) -> str:
+    """Bar chart of OOS metric by fold."""
     folds   = [f.fold_idx for f in result.folds]
     metrics = [f.oos_metric for f in result.folds]
     colours = [_C_POSITIVE if m > 0 else _C_NEGATIVE for m in metrics]
@@ -308,10 +312,10 @@ def _build_overview(cfg: dict) -> str:
     ]
     if ex:
         rows += [
-            ("Commission",  f"{ex['commission_bps']} bps"),
-            ("Spread",      f"{ex['spread_bps']} bps"),
-            ("Slippage k",  str(ex["slippage_k"])),
-            ("ADV Window",  f"{ex['adv_window']} days"),
+            ("Commission", f"{ex['commission_bps']} bps"),
+            ("Spread",     f"{ex['spread_bps']} bps"),
+            ("Slippage k", str(ex["slippage_k"])),
+            ("ADV Window", f"{ex['adv_window']} days"),
         ]
     return _card("Overview", _kv_table(rows))
 
@@ -405,18 +409,19 @@ def _build_permutation_section(result: PermutationResult) -> str:
 
 
 def _build_walk_forward_section(result: WalkForwardResult) -> str:
-    oos     = [f.oos_metric for f in result.folds]
-    n_pos   = sum(1 for m in oos if m > 0)
+    oos    = [f.oos_metric for f in result.folds]
+    metric = result.metric.capitalize()
+    n_pos  = sum(1 for m in oos if m > 0)
     summary_rows = [
         ("Scheme",                  result.scheme),
-        ("Metric",                  result.metric),
+        ("Metric",                  metric),
         ("Folds",                   str(len(result.folds))),
-        ("Mean OOS Sharpe",         _fmt_ratio(np.mean(oos))),
-        ("Std OOS Sharpe",          _fmt_ratio(np.std(oos))),
+        (f"Mean OOS {metric}",      _fmt_ratio(np.mean(oos))),
+        (f"Std OOS {metric}",       _fmt_ratio(np.std(oos))),
         ("Folds with Positive OOS", f"{n_pos} / {len(result.folds)}"),
     ]
     headers = ["Fold", "IS Start", "IS End", "OOS Start", "OOS End",
-               "Best IS Sharpe", "OOS Sharpe", "Selected Params"]
+               f"Best IS {metric}", f"OOS {metric}", "Selected Params"]
     fold_rows = []
     for fold in result.folds:
         best_is    = max(fold.param_results, key=lambda x: x.is_metric).is_metric
