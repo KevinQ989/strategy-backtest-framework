@@ -222,18 +222,18 @@ def test_adv_fallback_for_unknown_tickers(price_df):
 
 def test_commission_non_negative():
     abs_trade_values = pd.Series([10_000.0, 20_000.0])
-    result = _compute_commission(abs_trade_values, CAPITAL, COMMISSION_BPS)
+    result = _compute_commission(abs_trade_values, COMMISSION_BPS)
     assert result >= 0.0
 
 
 def test_commission_zero_for_zero_trade():
-    result = _compute_commission(pd.Series([0.0]), CAPITAL, COMMISSION_BPS)
+    result = _compute_commission(pd.Series([0.0]), COMMISSION_BPS)
     assert result == pytest.approx(0.0)
  
  
 def test_commission_scales_with_bps():
-    base = _compute_commission(pd.Series([100_000.0]), CAPITAL, 5.0)
-    doubled = _compute_commission(pd.Series([100_000.0]), CAPITAL, 10.0)
+    base = _compute_commission(pd.Series([100_000.0]), 5.0)
+    doubled = _compute_commission(pd.Series([100_000.0]), 10.0)
     assert doubled == pytest.approx(2 * base)
 
 
@@ -243,18 +243,18 @@ def test_commission_scales_with_bps():
 
 def test_spread_non_negative():
     abs_trade_values = pd.Series([10_000.0, 20_000.0])
-    result = _compute_spread(abs_trade_values, CAPITAL, SPREAD_BPS)
+    result = _compute_spread(abs_trade_values, SPREAD_BPS)
     assert result >= 0.0
 
 
 def test_spread_zero_for_zero_trade():
-    result = _compute_spread(pd.Series([0.0]), CAPITAL, SPREAD_BPS)
+    result = _compute_spread(pd.Series([0.0]), SPREAD_BPS)
     assert result == pytest.approx(0.0)
  
  
 def test_spread_scales_with_bps():
-    base = _compute_spread(pd.Series([100_000.0]), CAPITAL, 5.0)
-    doubled = _compute_spread(pd.Series([100_000.0]), CAPITAL, 10.0)
+    base = _compute_spread(pd.Series([100_000.0]), 5.0)
+    doubled = _compute_spread(pd.Series([100_000.0]), 10.0)
     assert doubled == pytest.approx(2 * base)
 
 
@@ -265,20 +265,20 @@ def test_spread_scales_with_bps():
 def test_slippage_non_negative(tickers):
     abs_trade_values = pd.Series({tickers[0]: 100_000.0})
     adv = pd.Series({tickers[0]: 5_000_000.0})
-    result = _compute_slippage(abs_trade_values, adv, CAPITAL, SLIPPAGE_K)
+    result = _compute_slippage(abs_trade_values, adv, SLIPPAGE_K)
     assert result >= 0.0
 
 
 def test_slippage_zero_for_zero_trade(tickers):
     ticker = tickers[0]
     adv = pd.Series({ticker: 5_000_000.0})
-    result = _compute_slippage(pd.Series({ticker: 0.0}), adv, CAPITAL, SLIPPAGE_K)
+    result = _compute_slippage(pd.Series({ticker: 0.0}), adv, SLIPPAGE_K)
     assert result == pytest.approx(0.0)
 
 
 def test_slippage_increases_with_order_size(tickers):
     ticker = tickers[0]
     adv = pd.Series({ticker: 5_000_000.0})
-    small = _compute_slippage(pd.Series({ticker: 50_000.0}), adv, CAPITAL, SLIPPAGE_K)
-    large = _compute_slippage(pd.Series({ticker: 200_000.0}), adv, CAPITAL, SLIPPAGE_K)
+    small = _compute_slippage(pd.Series({ticker: 50_000.0}), adv, SLIPPAGE_K)
+    large = _compute_slippage(pd.Series({ticker: 200_000.0}), adv, SLIPPAGE_K)
     assert large > small

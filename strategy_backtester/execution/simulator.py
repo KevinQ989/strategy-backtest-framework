@@ -98,9 +98,9 @@ def execute(
     # Compute costs
     abs_trade_values = trade_values.abs()
     adv = _compute_adv(hist_prices, weight_delta.index, adv_window)
-    commission = _compute_commission(abs_trade_values, total_value, commission_bps)
-    spread = _compute_spread(abs_trade_values, total_value, spread_bps)
-    slippage = _compute_slippage(abs_trade_values, adv, total_value, slippage_k)
+    commission = _compute_commission(abs_trade_values, commission_bps)
+    spread = _compute_spread(abs_trade_values, spread_bps)
+    slippage = _compute_slippage(abs_trade_values, adv, slippage_k)
     turnover = float(abs_trade_values.sum() / total_value)
 
     return ExecutionResult(
@@ -152,32 +152,29 @@ def _compute_adv(
 
 def _compute_commission(
     abs_trade_values: pd.Series,
-    total_value: float,
     commission_bps: float
 ) -> float:
-    """Flat per-side commission as fraction of portfolio value."""
-    return float(abs_trade_values.sum() * commission_bps * BPS / total_value)
+    """Flat per-side commission."""
+    return float(abs_trade_values.sum() * commission_bps * BPS)
 
 
 def _compute_spread(
     abs_trade_values: pd.Series,
-    total_value: float,
     spread_bps: float
 ) -> float:
-    """Flat per-side spread as fraction of portfolio value."""
-    return float(abs_trade_values.sum() * spread_bps * BPS / total_value)
+    """Flat per-side spread."""
+    return float(abs_trade_values.sum() * spread_bps * BPS)
 
 
 def _compute_slippage(
     abs_trade_values: pd.Series,
     adv: pd.Series,
-    total_value: float,
     slippage_k: float
 ) -> float:
-    """Slippage = k * (order / ADV) as fraction of portfolio value."""
+    """Slippage = k * (order / ADV)."""
     participation = abs_trade_values / adv.reindex(abs_trade_values.index)
     slippage = slippage_k * participation * abs_trade_values
-    return float(slippage.sum() / total_value)
+    return float(slippage.sum())
 
 
 def _no_trade_result(date: pd.Timestamp) -> ExecutionResult:

@@ -124,15 +124,13 @@ class PortfolioState:
 
         Must be called after mark_to_market on the same day so that
         _last_prices is current for accurate dollar fill computation.
-        Costs are deducted as a fraction of pre-trade portfolio value.
+        Costs are deducted directly from cash.
 
         Parameters
         ----------
         result : ExecutionResult
             The result of the day's execution, including fills and costs.
         """
-        pre_trade_value = self.total_value
-
         # Update positions based on fills
         self.positions = self.positions.add(result.fills, fill_value=0.0)
         self.positions = self.positions[self.positions.abs() > 1e-8]
@@ -140,7 +138,7 @@ class PortfolioState:
         # Update cash based on fills and costs
         fill_cost = (result.fills * result.execution_prices.reindex(result.fills.index)).sum()
         self.cash -= fill_cost
-        self.cash -= result.total_cost * pre_trade_value
+        self.cash -= result.total_cost
         self._invalidate_cache()
 
     

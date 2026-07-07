@@ -199,9 +199,10 @@ def _build_return_analysis(result: BacktestResult, window: int) -> str:
 
 
 def _build_costs_summary(result: BacktestResult) -> str:
+    trade_costs = result.costs[result.costs > 0]
     rows = [
-        ("Total Transaction Costs", f"${result.costs.sum():>,.2f}"),
-        ("Avg Daily Costs",         f"${result.costs.mean():>,.4f}"),
+        ("Total Transaction Costs", f"${trade_costs.sum():>,.2f}"),
+        ("Avg Cost per Rebalance",  f"${trade_costs.mean():>,.2f}"),
         ("Avg Daily Turnover",      f"{result.turnover.mean():.4%}"),
     ]
     return _card("Transaction Costs", _kv_table(rows))
