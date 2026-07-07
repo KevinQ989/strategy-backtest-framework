@@ -208,12 +208,11 @@ class WalkForwardTest:
 
         if "lookback" in param_grid:
             max_lookback = max(param_grid["lookback"])
-            if scheme.win_in < max_lookback:
+            if scheme.win_in <= max_lookback:
                 raise ValueError(
-                    f"win_in={scheme.win_in} is less than the maximum lookback in "
-                    f"param_grid ({max_lookback}). The IS window must be at least as "
-                    f"long as the longest lookback; otherwise the strategy cannot "
-                    f"generate a signal and IS metric selection is meaningless."
+                    f"win_in={scheme.win_in} is less than or equal to the maximum lookback in "
+                    f"param_grid ({max_lookback}). The IS window must be longer than the longest lookback, "
+                    f"otherwise the strategy cannot generate a signal and IS metric selection is meaningless."
                 )
 
         unique_dates = prices.index.get_level_values("Date").unique()

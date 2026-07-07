@@ -26,8 +26,7 @@ from .metrics import (
 from .plots import (
     # Design tokens — defined once in plots.py, shared here
     _C_BG, _C_SURFACE, _C_BORDER, _C_TEXT, _C_MUTED, _C_ACCENT,
-    _C_POSITIVE, _C_NEGATIVE, _C_CHART_1, _C_CHART_2,
-    _FONT_STACK, _MONO_STACK,
+    _C_POSITIVE, _C_NEGATIVE, _FONT_STACK, _MONO_STACK,
     # Chart functions
     chart_permutation_envelope,
     chart_underwater_drawdown,
