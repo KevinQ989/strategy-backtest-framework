@@ -12,9 +12,9 @@ from strategy_backtester.core import (
     WalkForwardResult,
 )
 from .metrics import (
-    calc_cumulative_return,
+    calc_holding_period_return,
     calc_final_value,
-    calc_annualised_return,
+    calc_effective_annual_rate,
     calc_annualised_volatility,
     calc_sharpe_ratio,
     calc_sortino_ratio,
@@ -156,15 +156,16 @@ def _build_performance_summary(result: BacktestResult) -> str:
         if np.isnan(val) or np.isinf(val): return None
         return "pos" if val > 0 else "neg" if val < 0 else None
 
+    hpr     = calc_holding_period_return(r)
+    ear     = calc_effective_annual_rate(r)
     sharpe  = _safe_sharpe(r)
     sortino = calc_sortino_ratio(r)
-    calmar  = calc_calmar_ratio(c, r)
-    ann_ret = calc_annualised_return(c, r)
+    calmar  = calc_calmar_ratio(r)
 
     tiles = [
-        ("Final Portfolio Value", f"${calc_final_value(c, r):>,.2f}",        _sign(calc_cumulative_return(r))),
-        ("Cumulative Return",     f"{calc_cumulative_return(r):.2%}",         _sign(calc_cumulative_return(r))),
-        ("Annualised Return",     f"{ann_ret:.2%}",                           _sign(ann_ret)),
+        ("Final Portfolio Value", f"${calc_final_value(c, r):>,.2f}",         _sign(calc_final_value(c, r) - c)),
+        ("Holding Period Return", f"{hpr:.2%}",                               _sign(hpr)),
+        ("Annualised Return",     f"{ear:.2%}",                               _sign(ear)),
         ("Annualised Volatility", f"{calc_annualised_volatility(r):.2%}",     None),
         ("Sharpe Ratio",          _fmt_ratio(sharpe),                         _sign(sharpe)),
         ("Sortino Ratio",         _fmt_ratio(sortino),                        _sign(sortino)),

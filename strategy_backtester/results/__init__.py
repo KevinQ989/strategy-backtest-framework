@@ -1,7 +1,7 @@
 from .metrics import (
-    calc_cumulative_return,
+    calc_holding_period_return,
     calc_final_value,
-    calc_annualised_return,
+    calc_effective_annual_rate,
     calc_annualised_volatility,
     calc_sharpe_ratio,
     calc_sortino_ratio,
@@ -15,9 +15,9 @@ from .metrics import (
 from .tearsheet import generate_tear_sheet
 
 __all__ = [
-    "calc_cumulative_return",
+    "calc_holding_period_return",
     "calc_final_value",
-    "calc_annualised_return",
+    "calc_effective_annual_rate",
     "calc_annualised_volatility",
     "calc_sharpe_ratio",
     "calc_sortino_ratio",

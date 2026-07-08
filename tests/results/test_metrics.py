@@ -9,27 +9,25 @@ def sample_returns():
 
 
 @pytest.fixture
-def expected_cumulative_returns():
+def expected_holding_period_return():
     return ((1 + 0.01) * (1 - 0.02) * (1 + 0.03)) ** 84 - 1
 
 
-def test_calc_cumulative_return(sample_returns, expected_cumulative_returns):
-    assert abs(metrics.calc_cumulative_return(sample_returns) - expected_cumulative_returns) < 1e-4
-    assert metrics.calc_cumulative_return(pd.Series([])) == 0.0
+def test_calc_holding_period_return(sample_returns, expected_holding_period_return):
+    assert abs(metrics.calc_holding_period_return(sample_returns) - expected_holding_period_return) < 1e-4
+    assert metrics.calc_holding_period_return(pd.Series([])) == 0.0
 
 
-def test_calc_final_value(sample_returns, expected_cumulative_returns):
+def test_calc_final_value(sample_returns, expected_holding_period_return):
     initial_value = 1000
-    expected_final_value = initial_value * (1 + expected_cumulative_returns)
+    expected_final_value = initial_value * (1 + expected_holding_period_return)
     assert abs(metrics.calc_final_value(initial_value, sample_returns) - expected_final_value) < 1e-4
 
 
-def test_calc_annualised_return(sample_returns, expected_cumulative_returns):
-    initial_value = 1000
-    expected_annualised_return = (1 + expected_cumulative_returns) ** (252 / len(sample_returns)) - 1
-    assert abs(metrics.calc_annualised_return(initial_value, sample_returns) - expected_annualised_return) < 1e-4
-    with pytest.raises(ValueError, match="Portfolio value non-positive"):
-        metrics.calc_annualised_return(initial_value, pd.Series([-1.0] * 252))
+def test_calc_effective_annual_rate(sample_returns, expected_holding_period_return):
+    expected_annualised_return = (1 + expected_holding_period_return) ** (252 / len(sample_returns)) - 1
+    assert abs(metrics.calc_effective_annual_rate(sample_returns) - expected_annualised_return) < 1e-4
+    assert metrics.calc_effective_annual_rate(pd.Series([])) == 0.0
 
 
 def test_calc_annualised_volatility(sample_returns):

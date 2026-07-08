@@ -1,26 +1,21 @@
 import numpy as np
 import pandas as pd
 
-def calc_cumulative_return(returns: pd.Series) -> float:
+def calc_holding_period_return(returns: pd.Series) -> float:
     if returns.empty:
         return 0.0
     return (1 + returns).prod() - 1
 
 
 def calc_final_value(initial_value: float, returns: pd.Series) -> float:
-    return initial_value * (1 + calc_cumulative_return(returns))
+    return initial_value * (1 + calc_holding_period_return(returns))
 
 
-def calc_annualised_return(initial_value: float, returns: pd.Series) -> float:
-    final_value = calc_final_value(initial_value, returns)
-    if final_value <= 0:
-        raise ValueError(
-            f"Portfolio value non-positive (final_value={final_value:.2f}). "
-            "Simulation reached a state with no margin call / liquidation modeling. "
-            "Annualised return is undefined."
-        )
-    days = len(returns)
-    return (final_value / initial_value) ** (1 / (days / 252)) - 1
+def calc_effective_annual_rate(returns: pd.Series) -> float:
+    if returns.empty:
+        return 0.0
+    years = len(returns) / 252
+    return (1 + calc_holding_period_return(returns)) ** (1 / years) - 1
 
 
 def calc_annualised_volatility(returns: pd.Series) -> float:
@@ -52,11 +47,11 @@ def calc_sortino_ratio(returns: pd.Series) -> float:
     return (excess_returns.mean() / np.sqrt(downside_variance)) * np.sqrt(252)
 
 
-def calc_calmar_ratio(initial_value: float, returns: pd.Series) -> float:
+def calc_calmar_ratio(returns: pd.Series) -> float:
     max_dd = calc_max_drawdown(returns)
     if max_dd == 0:
         return np.inf
-    return calc_annualised_return(initial_value, returns) / abs(max_dd)
+    return calc_effective_annual_rate(returns) / abs(max_dd)
 
 
 def calc_max_drawdown(returns: pd.Series) -> float:

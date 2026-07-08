@@ -35,6 +35,6 @@ pythonpath = ["."]
 omit = [
     "*/__init__.py",
     "strategy_backtester/main.py",
-    "strategy_backtester/results/plots.py"
+    "strategy_backtester/results/plots.py",
     "strategy_backtester/results/tearsheet.py",
 ]
