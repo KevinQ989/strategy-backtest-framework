@@ -1,5 +1,6 @@
 from __future__ import annotations
 import itertools
+import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import pandas as pd
 from strategy_backtester.core import (
@@ -24,7 +25,8 @@ def _evaluate_params_worker(
     prices: PriceDataFrame,
     metric: str,
     initial_capital: float,
-    strict: bool = False
+    strict: bool = False,
+    eval_start: pd.Timestamp | None = None
 ) -> float:
     """
     Instantiate strategy_cls with params, run a backtest over prices, and
@@ -57,6 +59,9 @@ def _evaluate_params_worker(
         If True, any exception raised during strategy instantiation, engine
         construction, or backtest execution is propagated to the caller rather
         than returning -inf. Used for OOS evaluation of the selected parameter.
+    eval_start: pd.Timestamp or None, default None
+        If provided, only returns on or after this date are used to compute the metric.
+        Used to exclude the warmup prefix from OOS metric computation.
 
     Returns
     -------
@@ -74,7 +79,12 @@ def _evaluate_params_worker(
         strategy = strategy_cls(**params)
         engine = BacktestEngine(prices, strategy, initial_capital=initial_capital)
         result = engine.run_backtest()
-        return _compute_metric(result, metric)
+        returns = (
+            result.returns[result.returns.index >= eval_start]
+            if eval_start is not None
+            else result.returns
+        )
+        return _compute_metric(returns, metric)
     except Exception as e:
         if strict:
             raise RuntimeError(
@@ -84,14 +94,14 @@ def _evaluate_params_worker(
             return float("-inf")
 
 
-def _compute_metric(result: BacktestResult, metric: str) -> float:
+def _compute_metric(returns: pd.Series, metric: str) -> float:
     """
-    Compute a named performance metric from a BacktestResult.
+    Compute a named performance metric from a series of returns.
 
     Parameters
     ----------
-    result : BacktestResult
-        Completed backtest result.
+    returns : pd.Series
+        Series of returns.
     metric : str
         Name of the metric to compute. Currently supports "sharpe".
 
@@ -107,7 +117,7 @@ def _compute_metric(result: BacktestResult, metric: str) -> float:
     """
     if metric == "sharpe":
         try:
-            return calc_sharpe_ratio(result.returns)
+            return calc_sharpe_ratio(returns)
         except ValueError:
             return float("-inf")
     raise ValueError(
@@ -130,6 +140,15 @@ class WalkForwardTest:
     OOS metrics against IS metrics reveals whether parameter selection is
     exploiting in-sample noise (overfitting) or capturing a stable signal.
 
+    OOS Warmup
+    ----------
+    OOS backtests are not cold-started at oos_start. Instead, a warmup prefix
+    of (lookback + skip) trading days immediately before oos_start is prepended
+    to the OOS price slice. This allows the strategy to build up a signal
+    before the evaluation window begins, matching realistic deployment where
+    the strategy has been running continuously. Only returns from oos_start
+    onward are used to compute the OOS metric.
+    
     Parameters
     ----------
     prices : PriceDataFrame
@@ -213,6 +232,18 @@ class WalkForwardTest:
                     f"win_in={scheme.win_in} is less than or equal to the maximum lookback in "
                     f"param_grid ({max_lookback}). The IS window must be longer than the longest lookback, "
                     f"otherwise the strategy cannot generate a signal and IS metric selection is meaningless."
+                )
+            # Warn if any combination needs more warmup than win_out provides
+            max_warmup = max(
+                p.get("lookback", 0) + p.get("skip", 0)
+                for p in self.param_combinations
+            )
+            if max_warmup > scheme.win_out:
+                warnings.warn(
+                    f"Some parameter combinations require up to {max_warmup} warmup "
+                    f"days (lookback + skip) but win_out={scheme.win_out}. OOS "
+                    f"evaluation for these combinations will prepend a warmup prefix "
+                    f"from before oos_start and report metrics from oos_start onward."
                 )
 
         unique_dates = prices.index.get_level_values("Date").unique()
@@ -314,6 +345,34 @@ class WalkForwardTest:
                 f"Check that fold boundaries fall within the available price history."
             )
         return sliced
+    
+
+    def _oos_warmup_start(
+        self,
+        selected_params: dict,
+        oos_start: pd.Timestamp,
+    ) -> pd.Timestamp:
+        """
+        Return the date (lookback + skip) trading days before oos_start,
+        clamped to the earliest available date in self.prices.
+
+        Parameters
+        ----------
+        selected_params : dict
+            The parameter combination selected from the IS grid search.
+        oos_start : pd.Timestamp
+            The first date of the OOS evaluation window.
+
+        Returns
+        -------
+        pd.Timestamp
+            Start of the extended OOS price slice.
+        """
+        warmup_days = selected_params.get("lookback", 0) + selected_params.get("skip", 0)
+        unique_dates = self.prices.index.get_level_values("Date").unique().sort_values()
+        oos_start_idx = unique_dates.searchsorted(oos_start)
+        warmup_start_idx = max(0, oos_start_idx - warmup_days)
+        return unique_dates[warmup_start_idx]
 
 
     def _run_fold(
@@ -359,7 +418,6 @@ class WalkForwardTest:
             If OOS evaluation of the selected params raises an exception.
         """
         is_prices = self._slice_prices(is_start, is_end)
-        oos_prices = self._slice_prices(oos_start, oos_end)
 
         # Run IS grid search in parallel
         param_results = []
@@ -393,6 +451,8 @@ class WalkForwardTest:
 
         # Run OOS evaluation on the selected parameters
         selected = max(param_results, key=lambda pr: pr.is_metric)
+        warmup_start = self._oos_warmup_start(selected.params, oos_start)
+        oos_prices = self._slice_prices(warmup_start, oos_end)
         oos_metric = _evaluate_params_worker(
             self.strategy_cls,
             selected.params,

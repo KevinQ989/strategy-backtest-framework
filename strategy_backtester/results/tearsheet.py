@@ -65,7 +65,8 @@ def _safe_sharpe(returns: pd.Series) -> float:
 # ------------------------------------------------------------------
 
 def _fmt_ratio(val: float, fmt: str = ".4f") -> str:
-    if np.isinf(val): return "∞"
+    if np.isposinf(val): return "∞"
+    if np.isneginf(val): return "-∞"
     if np.isnan(val): return "N/A"
     return format(val, fmt)
 

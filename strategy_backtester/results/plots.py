@@ -31,7 +31,7 @@ _MONO_STACK = "'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace"
 
 
 # ------------------------------------------------------------------
-# Partner charts
+# Charts
 # ------------------------------------------------------------------
 
 def chart_permutation_envelope(perm_result: PermutationResult) -> plt.Figure:
@@ -194,10 +194,6 @@ def chart_returns_histogram_kde(result: BacktestResult) -> plt.Figure:
     fig.tight_layout()
     return fig
 
-
-# ------------------------------------------------------------------
-# Tearsheet charts
-# ------------------------------------------------------------------
 
 def chart_monthly_returns(returns: pd.Series) -> plt.Figure:
     """Monthly returns heatmap (years × months)."""
