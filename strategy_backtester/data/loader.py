@@ -1,8 +1,9 @@
 from __future__ import annotations
-from .dataframe import PriceDataFrame, PRICE_FIELDS, make_price_dataframe
+import logging
 import yfinance as yf
 import pandas as pd
 import os
+from .dataframe import PriceDataFrame, PRICE_FIELDS, make_price_dataframe
 
 DATA_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = os.path.join(DATA_DIRECTORY, "market_data_cache.csv")
@@ -170,6 +171,8 @@ def _download(
 ) -> pd.DataFrame:
     """Download data for the specified ticker and date range."""
     print(f"Downloading {ticker} from {start_ts.strftime('%Y-%m-%d')} to {end_ts.strftime('%Y-%m-%d')}")
+    yf_log = logging.getLogger("yfinance")
+    yf_log.setLevel(logging.CRITICAL)
     raw = yf.download(
         ticker,
         start=start_ts,
@@ -177,6 +180,7 @@ def _download(
         auto_adjust=False,
         progress=False
     )
+    yf_log.setLevel(logging.WARNING)
     if raw.empty:
         return pd.DataFrame()
     if raw.index.tz is not None:

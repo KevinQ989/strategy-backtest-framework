@@ -242,22 +242,21 @@ def test_update_to_execution_short(trading_dates, price_df):
 def test_update_to_execution_costs_deducted_from_cash(trading_dates, price_df):
     state = _make_state(trading_dates, price_df)
     state.update_to_market(price_df.xs(trading_dates[0], level="Date")["Close"], trading_dates[0])
-    pre_trade_value = state.total_value
-    slippage_fraction = 0.001
-    cost_fraction = 0.0005
-    spread_fraction = 0.0002
+    slippage = 1_000
+    commission = 500
+    spread = 200
     result = ExecutionResult(
         date=trading_dates[0],
         fills=pd.Series(dtype=float),
         execution_prices=pd.Series(dtype=float),
         turnover=0.0,
-        slippage=slippage_fraction,
-        commission=cost_fraction,
-        spread=spread_fraction,
+        slippage=slippage,
+        commission=commission,
+        spread=spread,
     )
     state.update_to_execution(result)
-    total_cost_fraction = slippage_fraction + cost_fraction + spread_fraction
-    assert state.cash == pytest.approx(CAPITAL - total_cost_fraction * pre_trade_value)
+    total_cost = slippage + commission + spread
+    assert state.cash == pytest.approx(CAPITAL - total_cost)
 
 
 def test_update_to_execution_zero_position_removed(trading_dates, price_df):

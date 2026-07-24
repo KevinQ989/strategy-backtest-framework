@@ -1,12 +1,10 @@
 from __future__ import annotations
-import numpy as np
 import pandas as pd
 import pytest
 from strategy_backtester.core import BacktestResult, PortfolioWeights
-from strategy_backtester.data import get_field
 from strategy_backtester.engine import BacktestEngine
 from strategy_backtester.strategies import BaseStrategy, RandomStrategy, CrossSectionalMomentumStrategy
-
+from strategy_backtester.results import calc_final_value
 
 # ---------------------------------------------------------------------------
 # Slicing regression: historical_data.loc[:current_date] must return ALL
@@ -247,7 +245,7 @@ def test_never_rebalance_strategy_produces_flat_zero_returns(price_df):
     assert (result.returns == 0.0).all()
     assert (result.costs == 0.0).all()
     assert (result.turnover == 0.0).all()
-    assert result.final_value == pytest.approx(result.starting_capital)
+    assert calc_final_value(result.starting_capital, result.returns) == pytest.approx(result.starting_capital)
 
 
 # ---------------------------------------------------------------------------
