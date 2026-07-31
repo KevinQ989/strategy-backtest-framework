@@ -102,3 +102,9 @@ def calc_cumulative_returns_series(returns: pd.Series) -> pd.Series:
     if returns.empty:
         return pd.Series(dtype=float)
     return (1 + returns).cumprod() - 1
+
+
+def calc_precost_returns(returns: pd.Series, costs: pd.Series, starting_capital: float) -> pd.Series:
+    if returns.empty:
+        return returns
+    return returns + (costs / starting_capital)

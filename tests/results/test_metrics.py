@@ -43,3 +43,14 @@ def test_calc_sharpe_ratio(sample_returns):
     assert metrics.calc_sharpe_ratio(pd.Series([])) == 0.0
     with pytest.raises(ValueError, match="Standard deviation of returns is zero"):
         metrics.calc_sharpe_ratio(pd.Series([0.01] * 252))
+
+
+def test_calc_precost_returns(sample_returns):
+    costs = pd.Series([100.0] * len(sample_returns))
+    starting_capital = 1_000_000.0
+    expected = sample_returns + (costs / starting_capital)
+    result = metrics.calc_precost_returns(sample_returns, costs, starting_capital)
+    pd.testing.assert_series_equal(result, expected)
+
+    empty = pd.Series([], dtype=float)
+    assert metrics.calc_precost_returns(empty, empty, starting_capital).empty

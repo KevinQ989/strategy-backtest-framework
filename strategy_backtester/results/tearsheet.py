@@ -22,6 +22,9 @@ from .metrics import (
     calc_max_drawdown,
     calc_max_drawdown_duration,
     calc_win_rate,
+    calc_rolling_drawdown,
+    calc_cumulative_returns_series,
+    calc_precost_returns,
 )
 from .plots import (
     # Design tokens — defined once in plots.py, shared here
@@ -202,10 +205,15 @@ def _build_return_analysis(result: BacktestResult, window: int) -> str:
 
 def _build_costs_summary(result: BacktestResult) -> str:
     trade_costs = result.costs[result.costs > 0]
+    precost_ret = calc_precost_returns(result.returns, result.costs, result.starting_capital)
+    postcost_sharpe = _safe_sharpe(result.returns)
+    precost_sharpe  = _safe_sharpe(precost_ret)
     rows = [
         ("Total Transaction Costs", f"${trade_costs.sum():>,.2f}"),
         ("Avg Cost per Rebalance",  f"${trade_costs.mean():>,.2f}"),
         ("Avg Daily Turnover",      f"{result.turnover.mean():.4%}"),
+        ("Pre-Cost Sharpe",         _fmt_ratio(precost_sharpe)),
+        ("Post-Cost Sharpe",        _fmt_ratio(postcost_sharpe)),
     ]
     return _card("Transaction Costs", _kv_table(rows))
 

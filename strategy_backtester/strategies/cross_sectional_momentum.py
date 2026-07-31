@@ -11,7 +11,7 @@ class CrossSectionalMomentumStrategy(BaseStrategy):
 
     Ranks all tickers by their 12-1 month return (12-month cumulative return
     excluding the most recent month) at each rebalance date. Goes long the top
-    quintile and short the bottom quintile with equal weighting within each leg.
+    quintile and short the bottom decile with equal weighting within each leg.
     Rebalances monthly.
 
     The 12-1 month return is defined as the cumulative return from 252 trading

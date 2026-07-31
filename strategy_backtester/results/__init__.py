@@ -11,6 +11,7 @@ from .metrics import (
     calc_win_rate,
     calc_rolling_drawdown,
     calc_cumulative_returns_series,
+    calc_precost_returns,
 )
 from .tearsheet import generate_tear_sheet
 
@@ -27,5 +28,6 @@ __all__ = [
     "calc_win_rate",
     "calc_rolling_drawdown",
     "calc_cumulative_returns_series",
+    "calc_precost_returns",
     "generate_tear_sheet",
 ]

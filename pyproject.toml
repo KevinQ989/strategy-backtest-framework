@@ -6,6 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "strategy_backtester"
 version = "0.1.0"
 description = "Strategy backtest framework for testing and evaluating trading strategies."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Kevin Quah" },
+    { name = "Timothy Lim" }
+]
 requires-python = ">=3.9"
 dependencies = [
     "numpy",
@@ -16,6 +22,9 @@ dependencies = [
     "pyyaml",
     "lxml"
 ]
+
+[project.urls]
+Repository = "https://github.com/KevinQ989/strategy-backtest-framework"
 
 [project.optional-dependencies]
 dev = [
